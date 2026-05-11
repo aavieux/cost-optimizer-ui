@@ -3,6 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useCustomerSummary } from '@/hooks/useCustomerSummary'
 import { formatCurrency, formatSavingsPercent } from '@/lib/format'
+import AnimatedCurrency from '@/components/AnimatedCurrency'
 import { getErrorCode } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { TimeWindow } from '@/types/dashboard'
@@ -152,21 +153,21 @@ export default function CustomerPage() {
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Spend</p>
               <p className="text-2xl font-semibold text-neutral-900">
-                {formatCurrency(data.monthly_cost_current)}
+                <AnimatedCurrency value={data.monthly_cost_current} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Recommended</p>
               <p className="text-2xl font-semibold text-neutral-900">
-                {formatCurrency(data.monthly_cost_recommended)}
+                <AnimatedCurrency value={data.monthly_cost_recommended} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Savings</p>
               <p className="text-2xl font-semibold text-emerald-600">
-                {formatCurrency(data.monthly_savings)}
+                <AnimatedCurrency value={data.monthly_savings} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">

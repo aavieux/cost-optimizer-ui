@@ -4,6 +4,7 @@ import { ArrowRight, TrendingDown, ArrowUpDown } from 'lucide-react'
 import { useDashboard } from '@/hooks/useDashboard'
 import { getErrorCode } from '@/lib/api'
 import { formatCurrency, formatSavingsPercent } from '@/lib/format'
+import AnimatedCurrency from '@/components/AnimatedCurrency'
 import { cn } from '@/lib/utils'
 import type { DashboardCustomer, TimeWindow } from '@/types/dashboard'
 
@@ -223,21 +224,21 @@ export default function DashboardPage() {
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Total Monthly Spend</p>
               <p className="text-2xl font-semibold text-neutral-900">
-                {formatCurrency(data.total_monthly_cost_current)}
+                <AnimatedCurrency value={data.total_monthly_cost_current} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Recommended</p>
               <p className="text-2xl font-semibold text-neutral-900">
-                {formatCurrency(data.total_monthly_cost_recommended)}
+                <AnimatedCurrency value={data.total_monthly_cost_recommended} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Savings</p>
               <p className="text-2xl font-semibold text-emerald-600">
-                {formatCurrency(data.total_monthly_savings)}
+                <AnimatedCurrency value={data.total_monthly_savings} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">
