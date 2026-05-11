@@ -50,7 +50,8 @@ export default function LoginPage() {
       const res = await api.post<LoginResponse>('/auth/login', data)
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('expires_at', res.data.expires_at)
-      navigate('/dashboard')
+      localStorage.setItem('username', res.data.moderator.username)
+      navigate('/')
     } catch (err: unknown) {
       resetField('password')
       const code =
