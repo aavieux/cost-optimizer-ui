@@ -12,6 +12,7 @@ const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
   { label: '1d', value: '1d' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
+  { label: '90d', value: '90d' },
 ]
 
 const SORT_OPTIONS = [

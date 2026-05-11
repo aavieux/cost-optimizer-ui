@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCustomerSummary } from '@/hooks/useCustomerSummary'
 import { formatCurrency, formatSavingsPercent } from '@/lib/format'
 import AnimatedCurrency from '@/components/AnimatedCurrency'
@@ -13,12 +13,16 @@ const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
   { label: '1d', value: '1d' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
+  { label: '90d', value: '90d' },
 ]
 
-function ClusterRow({ cluster }: { cluster: ClusterSummary }) {
+function ClusterRow({ cluster, customerId }: { cluster: ClusterSummary; customerId: number }) {
   const wb = cluster.workload_breakdown
   return (
-    <div className="flex items-center justify-between px-6 py-4">
+    <Link
+      to={`/customers/${customerId}/clusters/${cluster.cluster_id}`}
+      className="flex items-center justify-between px-6 py-4 hover:bg-neutral-50 transition-colors group"
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-neutral-900">{cluster.name}</span>
@@ -77,8 +81,9 @@ function ClusterRow({ cluster }: { cluster: ClusterSummary }) {
             <span className="text-xs font-normal text-neutral-400">/mo</span>
           </p>
         </div>
+        <ArrowRight size={14} className="text-neutral-300 group-hover:text-neutral-600 transition-colors" />
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -208,7 +213,7 @@ export default function CustomerPage() {
             ) : (
               <div className="bg-white border border-neutral-100 rounded-xl divide-y divide-neutral-100">
                 {data.clusters.map((cluster) => (
-                  <ClusterRow key={cluster.cluster_id} cluster={cluster} />
+                  <ClusterRow key={cluster.cluster_id} cluster={cluster} customerId={data.customer_id} />
                 ))}
               </div>
             )}
