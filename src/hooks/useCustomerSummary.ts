@@ -9,5 +9,6 @@ export function useCustomerSummary(customerId: number, timeWindow: TimeWindow) {
     queryFn: () =>
       api.get<CustomerSummary>(`/customers/${customerId}/summary?window=${timeWindow}`).then((r) => r.data),
     retry: false,
+    enabled: customerId > 0,
   })
 }

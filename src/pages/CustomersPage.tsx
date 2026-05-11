@@ -21,6 +21,7 @@ const SORT_OPTIONS = [
 ] as const
 
 type SortKey = typeof SORT_OPTIONS[number]['value']
+const VALID_SORT_KEYS = SORT_OPTIONS.map((o) => o.value) as readonly SortKey[]
 
 function sortCustomers(customers: Customer[], key: SortKey): Customer[] {
   return [...customers].sort((a, b) => {
@@ -43,9 +44,10 @@ type Modal =
 
 export default function CustomersPage() {
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>(
-    () => (localStorage.getItem('customers_sort') as SortKey) ?? 'name'
-  )
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const stored = localStorage.getItem('customers_sort')
+    return stored && (VALID_SORT_KEYS as readonly string[]).includes(stored) ? (stored as SortKey) : 'name'
+  })
   const [sortOpen, setSortOpen] = useState(false)
   const [modal, setModal] = useState<Modal | null>(null)
   const sortRef = useRef<HTMLDivElement>(null)
@@ -244,10 +246,10 @@ export default function CustomersPage() {
       )}
 
       {(modal?.type === 'create' || modal?.type === 'rename') && (
-        <Dialog onClose={() => setModal(null)}>
-          <h2 className="text-sm font-semibold text-neutral-900 mb-5">
-            {modal.type === 'create' ? 'New customer' : 'Rename customer'}
-          </h2>
+        <Dialog
+          title={modal.type === 'create' ? 'New customer' : 'Rename customer'}
+          onClose={() => setModal(null)}
+        >
           <form onSubmit={onSubmitName} className="space-y-4">
             <div>
               <label className="block text-xs text-neutral-500 mb-1.5">Name</label>
@@ -285,9 +287,8 @@ export default function CustomersPage() {
       )}
 
       {modal?.type === 'delete' && (
-        <Dialog onClose={() => setModal(null)}>
-          <h2 className="text-sm font-semibold text-neutral-900 mb-1">Delete customer</h2>
-          <p className="text-xs text-neutral-500 mb-5">
+        <Dialog title="Delete customer" onClose={() => setModal(null)}>
+          <p className="text-xs text-neutral-500 mb-5 -mt-2">
             <span className="font-medium text-neutral-700">{modal.customer.name}</span> and all its
             data will be permanently removed. This cannot be undone.
           </p>

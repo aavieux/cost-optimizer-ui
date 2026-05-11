@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, Navigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useCustomerSummary } from '@/hooks/useCustomerSummary'
 import { formatCurrency, formatSavingsPercent } from '@/lib/format'
@@ -86,6 +86,8 @@ export default function CustomerPage() {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d')
   const customerId = Number(id)
   const { data, isLoading, error } = useCustomerSummary(customerId, timeWindow)
+
+  if (!id || isNaN(customerId) || customerId <= 0) return <Navigate to="/customers" replace />
 
   return (
     <div className="px-8 py-8 max-w-5xl mx-auto">
