@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import CustomersPage from '@/pages/CustomersPage'
 import ClustersPage from '@/pages/ClustersPage'
+import CustomerPage from '@/pages/CustomerPage'
 
 const queryClient = new QueryClient()
 
@@ -40,6 +41,7 @@ export default function App() {
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerPage />} />
             <Route path="/clusters" element={<ClustersPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
