@@ -12,6 +12,7 @@ export function useClusterSummary(customerId: number, clusterId: number, timeWin
         .then((r) => r.data),
     enabled: customerId > 0 && clusterId > 0,
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     retry: false,
   })
 }
