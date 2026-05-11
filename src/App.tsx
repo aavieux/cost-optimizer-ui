@@ -1,8 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
+import Layout from '@/components/Layout'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
+import CustomersPage from '@/pages/CustomersPage'
+import ClustersPage from '@/pages/ClustersPage'
+import CustomerPage from '@/pages/CustomerPage'
 
 const queryClient = new QueryClient()
 
@@ -13,17 +17,18 @@ function isAuthenticated() {
   return new Date(expiresAt) > new Date()
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedLayout() {
   if (!isAuthenticated()) {
     localStorage.removeItem('token')
     localStorage.removeItem('expires_at')
+    localStorage.removeItem('username')
     return <Navigate to="/login" replace />
   }
-  return <>{children}</>
+  return <Layout />
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  if (isAuthenticated()) return <Navigate to="/dashboard" replace />
+  if (isAuthenticated()) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -33,15 +38,13 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route element={<ProtectedLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerPage />} />
+            <Route path="/clusters" element={<ClustersPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
       <Toaster richColors />

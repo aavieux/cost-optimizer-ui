@@ -28,4 +28,9 @@ api.interceptors.response.use(
   }
 )
 
+export function getErrorCode(error: unknown): string | undefined {
+  return (error as { response?: { data?: { error?: { code?: string } } } })
+    ?.response?.data?.error?.code
+}
+
 export default api
