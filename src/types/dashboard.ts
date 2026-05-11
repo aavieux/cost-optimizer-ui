@@ -35,4 +35,4 @@ export type DashboardResponse = {
   generated_at: string
 }
 
-export type TimeWindow = '1d' | '7d' | '30d' | '90d'
+export type TimeWindow = '1d' | '7d' | '30d'
