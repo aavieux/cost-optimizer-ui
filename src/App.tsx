@@ -21,12 +21,10 @@ function isAuthenticated() {
 
 function ProtectedLayout() {
   if (!isAuthenticated()) {
-    localStorage.removeItem('token')
-    localStorage.removeItem('expires_at')
-    localStorage.removeItem('username')
+    localStorage.clear()
     return <Navigate to="/login" replace />
   }
-  return <Layout />
+  return <CurrencyProvider><Layout /></CurrencyProvider>
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -36,7 +34,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <CurrencyProvider>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
@@ -53,6 +50,5 @@ export default function App() {
       </BrowserRouter>
       <Toaster richColors />
     </QueryClientProvider>
-    </CurrencyProvider>
   )
 }

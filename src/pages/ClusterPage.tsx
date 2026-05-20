@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, startTransition } from "react";
+﻿import { useState, useMemo, useRef, useEffect, startTransition } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -192,7 +192,7 @@ function DatePicker({
         {label ?? fmtDateInput(value)}
       </span>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-neutral-100 rounded-xl shadow-lg p-3 w-56">
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white/70 backdrop-blur-sm border border-white/70 shadow-md rounded-xl shadow-lg p-3 w-56">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={prevMonth}
@@ -1007,10 +1007,10 @@ export default function ClusterPage() {
 
       {/* Stats cards */}
       {summary.data && (
-        <div className="border border-neutral-100 rounded-xl mb-8">
+        <div className="bg-white border border-neutral-100 rounded-xl mb-8">
           <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
             <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Cost Overview</p>
-            <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
               {TIME_WINDOWS.map(({ label, value, diagnostic }) => (
                 <button
                   key={value}
@@ -1023,7 +1023,7 @@ export default function ClusterPage() {
                     timeWindow === value && diagnostic
                       ? "bg-amber-50 text-amber-700 shadow-sm"
                       : timeWindow === value
-                      ? "bg-white text-neutral-900 shadow-sm"
+                      ? "bg-[#2563AF]/10 text-[#2563AF]"
                       : "text-neutral-400 hover:text-neutral-700",
                   )}
                 >
@@ -1069,7 +1069,7 @@ export default function ClusterPage() {
                 </p>
                 <div className="relative group/tip">
                   <Info size={11} className="text-neutral-300 cursor-default" />
-                  <div className="absolute bottom-full left-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
+                  <div className="absolute bottom-full right-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
                     Projected monthly savings based on <span className="font-medium">{timeWindow}</span> of usage data. Recent changes to workload behavior may take a full {timeWindow} window to be reflected.
                   </div>
                 </div>
@@ -1147,7 +1147,7 @@ export default function ClusterPage() {
           <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
             Resource Usage
           </p>
-          <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
             {GRANULARITY_OPTIONS.map(({ label, value }) => (
               <button
                 key={value}
@@ -1155,7 +1155,7 @@ export default function ClusterPage() {
                 className={cn(
                   "px-3 py-1 rounded-md text-xs font-medium transition-colors",
                   granularity === value
-                    ? "bg-white text-neutral-900 shadow-sm"
+                    ? "bg-[#2563AF]/10 text-[#2563AF]"
                     : "text-neutral-400 hover:text-neutral-700",
                 )}
               >
@@ -1169,7 +1169,7 @@ export default function ClusterPage() {
           <div className="flex items-center gap-2 mb-5">
             <button
               onClick={() => navigateDay(-1)}
-              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:border-neutral-300 transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:shadow-lg hover:border-[#5AC9E9]/40 transition-colors"
             >
               <ArrowLeft size={12} />
             </button>
@@ -1182,7 +1182,7 @@ export default function ClusterPage() {
             <button
               onClick={() => navigateDay(1)}
               disabled={hourDay >= todayStr()}
-              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:border-neutral-300 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:shadow-lg hover:border-[#5AC9E9]/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
             >
               <ArrowRight size={12} />
             </button>
@@ -1301,7 +1301,7 @@ export default function ClusterPage() {
                     return next;
                   })
                 }
-                className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:border-neutral-300 transition-colors"
+                className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:shadow-lg hover:border-[#5AC9E9]/40 transition-colors"
                 title={sortDir === "asc" ? "Ascending" : "Descending"}
               >
                 {sortDir === "asc" ? (

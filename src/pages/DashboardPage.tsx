@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, TrendingDown, ArrowUpDown } from 'lucide-react'
 import { useDashboard } from '@/hooks/useDashboard'
@@ -208,7 +208,7 @@ export default function DashboardPage() {
                 className={cn(
                   'px-3 py-1 rounded-md text-xs font-medium transition-colors',
                   timeWindow === value
-                    ? 'bg-white text-neutral-900 shadow-sm'
+                    ? 'bg-[#2563AF]/10 text-[#2563AF]'
                     : 'text-neutral-400 hover:text-neutral-700'
                 )}
               >

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCustomerSummary } from '@/hooks/useCustomerSummary'
@@ -157,10 +157,10 @@ export default function CustomerPage() {
 
       {data && (
         <>
-          <div className="border border-neutral-100 rounded-xl mb-8">
+          <div className="bg-white border border-neutral-100 rounded-xl mb-8">
             <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
               <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Cost Overview</p>
-              <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
                 {TIME_WINDOWS.map(({ label, value }) => (
                   <button
                     key={value}
@@ -171,7 +171,7 @@ export default function CustomerPage() {
                     className={cn(
                       'px-3 py-1 rounded-md text-xs font-medium transition-colors',
                       timeWindow === value
-                        ? 'bg-white text-neutral-900 shadow-sm'
+                        ? 'bg-[#2563AF]/10 text-[#2563AF]'
                         : 'text-neutral-400 hover:text-neutral-700'
                     )}
                   >

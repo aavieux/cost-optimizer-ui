@@ -1,24 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 
 export type Currency = 'USD' | 'EUR'
 
-const RATE_KEY = 'eur_usd_rate'
-
-function storedRate(): number {
-  try {
-    const n = parseFloat(localStorage.getItem(RATE_KEY) ?? '')
-    return Number.isFinite(n) && n > 0 ? n : 1
-  } catch {
-    return 1
-  }
-}
-
-async function fetchEurRate(): Promise<number> {
-  const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json() as { rates: { EUR: number } }
-  return json.rates.EUR
-}
+// TODO: fetch live rate from an exchange rate API (e.g. frankfurter.app/latest?from=USD&to=EUR)
+const HARDCODED_EUR_RATE = 0.92
 
 type CurrencyContextValue = {
   currency: Currency
@@ -39,22 +24,9 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const s = localStorage.getItem('currency')
     return s === 'EUR' ? 'EUR' : 'USD'
   })
-  const [rate, setRate] = useState(storedRate)
-  const [isLoadingRate, setIsLoadingRate] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    setIsLoadingRate(true)
-    fetchEurRate()
-      .then((r) => {
-        if (cancelled) return
-        setRate(r)
-        localStorage.setItem(RATE_KEY, String(r))
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setIsLoadingRate(false) })
-    return () => { cancelled = true }
-  }, [])
+  const rate = HARDCODED_EUR_RATE
+  const isLoadingRate = false
 
   const setCurrency = useCallback((c: Currency) => {
     setCurrencyState(c)

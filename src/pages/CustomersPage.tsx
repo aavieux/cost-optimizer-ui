@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Search, ArrowUpDown, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -58,7 +58,7 @@ export default function CustomersPage() {
   const renameCustomer = useRenameCustomer()
   const deleteCustomer = useDeleteCustomer()
 
-  const { register, handleSubmit, formState: { errors }, setError, reset } = useForm<NameForm>({
+  const { register, handleSubmit, watch, formState: { errors }, setError, reset } = useForm<NameForm>({
     resolver: zodResolver(nameSchema),
     defaultValues: { name: '' },
   })
@@ -160,7 +160,7 @@ export default function CustomersPage() {
               {currentSortLabel}
             </button>
             {sortOpen && (
-              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-neutral-100 rounded-lg shadow-sm py-1 z-10">
+              <div className="absolute right-0 top-full mt-1 w-36 bg-white/90 backdrop-blur-sm border border-white/70 rounded-lg shadow-lg py-1 z-10">
                 {SORT_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -192,7 +192,7 @@ export default function CustomersPage() {
 
           <button
             onClick={() => setModal({ type: 'create' })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 text-white hover:bg-neutral-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#2563AF]/10 text-[#2563AF] hover:bg-[#2563AF]/15 transition-colors"
           >
             <Plus size={12} />
             New customer
@@ -224,11 +224,11 @@ export default function CustomersPage() {
             {search ? 'No customers match your search.' : 'No customers assigned.'}
           </p>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="bg-white border border-neutral-100 rounded-xl divide-y divide-neutral-100">
             {filtered.map((customer) => (
               <div
                 key={customer.id}
-                className="flex items-center justify-between py-4 -mx-3 px-3 rounded-lg group hover:bg-neutral-100 transition-colors"
+                className="flex items-center justify-between py-4 px-6 group hover:bg-neutral-50 transition-colors"
               >
                 <Link to={`/customers/${customer.id}`} className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-900 group-hover:text-black">
@@ -292,8 +292,8 @@ export default function CustomersPage() {
               </button>
               <button
                 type="submit"
-                disabled={isMutating}
-                className="px-4 py-1.5 text-xs font-medium bg-neutral-900 text-white rounded-lg hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+                disabled={isMutating || (modal.type === 'rename' && watch('name').trim() === modal.customer.name)}
+                className="px-4 py-1.5 text-xs font-medium bg-[#2563AF]/10 text-[#2563AF] rounded-lg hover:bg-[#2563AF]/15 disabled:opacity-40 transition-colors"
               >
                 {isMutating ? 'Saving…' : modal.type === 'create' ? 'Create' : 'Save'}
               </button>
