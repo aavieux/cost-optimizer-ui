@@ -9,6 +9,7 @@ import type { LoginResponse } from '@/types/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Logo from '@/assets/logo.svg?react'
 
 const loginSchema = z.object({
   username: z
@@ -70,16 +71,11 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-10">
 
         {/* Header */}
-        <div className="space-y-1 text-center">
-          <p className="text-xs tracking-widest text-neutral-400 uppercase">
-            Kubernetes Cost Intelligence
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
-            Cost Optimizer
-          </h1>
-          <p className="text-sm text-neutral-400 pt-1">
-            Sign in to your account
-          </p>
+        <div className="flex flex-col items-center gap-3">
+          <Logo className="h-28 w-auto" aria-label="Cloud Zenith" />
+          <span className="text-xl font-bold tracking-[0.28em] uppercase text-neutral-900">
+            Cloud Zenith
+          </span>
         </div>
 
         {/* Form */}

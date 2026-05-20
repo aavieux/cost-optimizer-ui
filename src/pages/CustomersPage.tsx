@@ -50,6 +50,7 @@ export default function CustomersPage() {
   })
   const [sortOpen, setSortOpen] = useState(false)
   const [modal, setModal] = useState<Modal | null>(null)
+  const [countdown, setCountdown] = useState(0)
   const sortRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, error } = useCustomers()
@@ -80,6 +81,21 @@ export default function CustomersPage() {
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [sortOpen])
+
+  const isDev = import.meta.env.VITE_ENV === 'dev'
+  const deleteTargetId = modal?.type === 'delete' ? modal.customer.id : null
+  useEffect(() => {
+    if (deleteTargetId === null) return
+    if (isDev) { setCountdown(0); return }
+    setCountdown(10)
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(interval); return 0 }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [deleteTargetId])
 
   const filtered = data
     ? sortCustomers(
@@ -212,7 +228,7 @@ export default function CustomersPage() {
             {filtered.map((customer) => (
               <div
                 key={customer.id}
-                className="flex items-center justify-between py-4 -mx-3 px-3 rounded-lg group hover:bg-neutral-50 transition-colors"
+                className="flex items-center justify-between py-4 -mx-3 px-3 rounded-lg group hover:bg-neutral-100 transition-colors"
               >
                 <Link to={`/customers/${customer.id}`} className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-900 group-hover:text-black">
@@ -301,10 +317,10 @@ export default function CustomersPage() {
             </button>
             <button
               onClick={onDelete}
-              disabled={isMutating}
+              disabled={isMutating || countdown > 0}
               className="px-4 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
             >
-              {isMutating ? 'Deleting…' : 'Delete'}
+              {isMutating ? 'Deleting…' : countdown > 0 ? `Delete (${countdown})` : 'Delete'}
             </button>
           </div>
         </Dialog>

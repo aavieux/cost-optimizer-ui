@@ -3,16 +3,15 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, TrendingDown, ArrowUpDown } from 'lucide-react'
 import { useDashboard } from '@/hooks/useDashboard'
 import { getErrorCode } from '@/lib/api'
-import { formatCurrency, formatSavingsPercent } from '@/lib/format'
+import { formatSavingsPercent } from '@/lib/format'
+import { useFormatCurrency } from '@/context/CurrencyContext'
 import AnimatedCurrency from '@/components/AnimatedCurrency'
 import { cn } from '@/lib/utils'
 import type { DashboardCustomer, TimeWindow } from '@/types/dashboard'
 
 const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
-  { label: '1d', value: '1d' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
-  { label: '90d', value: '90d' },
 ]
 
 const SORT_OPTIONS = [
@@ -24,6 +23,11 @@ const SORT_OPTIONS = [
 ] as const
 
 type SortKey = typeof SORT_OPTIONS[number]['value']
+
+function savingsLabel(window: TimeWindow): string {
+  if (window === '7d') return 'Weekly Savings'
+  return 'Monthly Savings'
+}
 
 function sortCustomers(customers: DashboardCustomer[], key: SortKey): DashboardCustomer[] {
   return [...customers].sort((a, b) => {
@@ -47,6 +51,7 @@ function sortCustomers(customers: DashboardCustomer[], key: SortKey): DashboardC
 }
 
 function CustomerCard({ customer }: { customer: DashboardCustomer }) {
+  const fmt = useFormatCurrency()
   return (
     <Link
       to={`/customers/${customer.customer_id}`}
@@ -66,32 +71,40 @@ function CustomerCard({ customer }: { customer: DashboardCustomer }) {
         <ArrowRight size={14} className="text-neutral-300 group-hover:text-neutral-600 transition-colors mt-0.5" />
       </div>
 
-      <div className="space-y-1 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 w-24">Current</span>
-          <span className="text-sm font-medium text-neutral-900">
-            {formatCurrency(customer.monthly_cost_current)}
-            <span className="text-xs text-neutral-400 font-normal">/mo</span>
-          </span>
+      {customer.cluster_count === 0 ? (
+        <div className="flex items-center justify-center py-6 mb-4 rounded-lg bg-neutral-50">
+          <span className="text-xs text-neutral-400">No clusters yet</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 w-24">Recommended</span>
-          <span className="text-sm font-medium text-neutral-900">
-            {formatCurrency(customer.monthly_cost_recommended)}
-            <span className="text-xs text-neutral-400 font-normal">/mo</span>
-          </span>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="space-y-1 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400 w-24">Current</span>
+              <span className="text-sm font-medium text-neutral-900">
+                {fmt(customer.monthly_cost_current)}
+                <span className="text-xs text-neutral-400 font-normal">/mo</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400 w-24">Recommended</span>
+              <span className="text-sm font-medium text-neutral-900">
+                {fmt(customer.monthly_cost_recommended)}
+                <span className="text-xs text-neutral-400 font-normal">/mo</span>
+              </span>
+            </div>
+          </div>
 
-      <div className="flex items-center gap-2 pt-4 border-t border-neutral-50">
-        <TrendingDown size={13} className="text-emerald-500" />
-        <span className="text-sm font-semibold text-emerald-600">
-          {formatCurrency(customer.monthly_savings)}/mo
-        </span>
-        <span className="text-xs text-neutral-400">
-          · {formatSavingsPercent(customer.monthly_cost_current, customer.monthly_savings)} savings
-        </span>
-      </div>
+          <div className="flex items-center gap-2 pt-4 border-t border-neutral-50">
+            <TrendingDown size={13} className="text-emerald-500" />
+            <span className="text-sm font-semibold text-emerald-600">
+              {fmt(customer.monthly_savings)}/mo
+            </span>
+            <span className="text-xs text-neutral-400">
+              · {formatSavingsPercent(customer.monthly_cost_current, customer.monthly_savings)} savings
+            </span>
+          </div>
+        </>
+      )}
 
       <div className="flex items-center gap-3 mt-3">
         {customer.cluster_breakdown.active > 0 && (
@@ -118,7 +131,12 @@ function CustomerCard({ customer }: { customer: DashboardCustomer }) {
 }
 
 export default function DashboardPage() {
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d')
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
+    const s = localStorage.getItem('time_window')
+    return (['7d', '30d'] as TimeWindow[]).includes(s as TimeWindow)
+      ? (s as TimeWindow)
+      : '7d'
+  })
   const [sortKey, setSortKey] = useState<SortKey>(
     () => (localStorage.getItem('dashboard_sort') as SortKey) ?? 'savings'
   )
@@ -183,7 +201,10 @@ export default function DashboardPage() {
             {TIME_WINDOWS.map(({ label, value }) => (
               <button
                 key={value}
-                onClick={() => setTimeWindow(value)}
+                onClick={() => {
+                  setTimeWindow(value)
+                  localStorage.setItem('time_window', value)
+                }}
                 className={cn(
                   'px-3 py-1 rounded-md text-xs font-medium transition-colors',
                   timeWindow === value
@@ -237,7 +258,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Savings</p>
+              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">{savingsLabel(timeWindow)}</p>
               <p className="text-2xl font-semibold text-emerald-600">
                 <AnimatedCurrency value={data.total_monthly_savings} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>

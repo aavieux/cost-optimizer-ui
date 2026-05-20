@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import api from '@/lib/api'
 import type { ClusterMetricsResponse } from '@/types/cluster'
 
@@ -20,6 +20,7 @@ export function useClusterMetrics({ customerId, clusterId, from, to, granularity
         })
         .then((r) => r.data),
     enabled: customerId > 0 && clusterId > 0,
+    placeholderData: keepPreviousData,
     retry: false,
   })
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, startTransition } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  Info,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -22,10 +23,12 @@ import { useClusterSummary } from "@/hooks/useClusterSummary";
 import { useClusterMetrics } from "@/hooks/useClusterMetrics";
 import { useClusterRecommendations } from "@/hooks/useClusterRecommendations";
 import {
-  formatCurrency,
   formatBytes,
   formatSavingsPercent,
+  fmtCpu,
+  fmtRam,
 } from "@/lib/format";
+import { useFormatCurrency } from "@/context/CurrencyContext";
 import { getErrorCode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import AnimatedCurrency from "@/components/AnimatedCurrency";
@@ -38,12 +41,30 @@ import type {
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
-const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
-  { label: "1d", value: "1d" },
+const TIME_WINDOWS: { label: string; value: TimeWindow; diagnostic?: boolean }[] = [
+  { label: "1d", value: "1d", diagnostic: true },
   { label: "7d", value: "7d" },
   { label: "30d", value: "30d" },
-  { label: "90d", value: "90d" },
 ];
+
+function savingsLabel(_window: TimeWindow): string {
+  return "Monthly Savings"
+}
+
+const PROVIDER_STYLE: Record<string, string> = {
+  azure: "text-blue-600 bg-blue-50",
+  aws:   "text-orange-600 bg-orange-50",
+  gcp:   "text-green-600 bg-green-50",
+  local: "text-neutral-400 bg-neutral-100",
+}
+
+function fmtRelativeTime(iso: string, now: number): string {
+  const secs = Math.floor((now - new Date(iso).getTime()) / 1000)
+  if (secs < 60) return "just now"
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
 
 type GranularityView = "hour" | "day";
 
@@ -105,37 +126,122 @@ function DatePicker({
   className?: string;
   label?: string;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(0);
+  const [viewMonth, setViewMonth] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-  function open() {
-    const el = ref.current;
-    if (!el) return;
-    try {
-      el.showPicker();
-    } catch {
-      el.focus();
-    }
+  function openPicker() {
+    const [y, m] = value
+      ? value.split("-").map(Number)
+      : [new Date().getFullYear(), new Date().getMonth() + 1];
+    setViewYear(y);
+    setViewMonth(m - 1);
+    setOpen(true);
   }
 
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
+        setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
+    else setViewMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
+    else setViewMonth((m) => m + 1);
+  }
+
+  function toStr(y: number, m: number, d: number): string {
+    return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  const startDow = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array<null>(startDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  const monthName = viewYear
+    ? new Date(viewYear, viewMonth, 1).toLocaleDateString("en-US", { month: "long" })
+    : "";
+
   return (
-    <span
-      onClick={open}
-      className={cn(
-        "text-xs text-neutral-700 border-b border-neutral-200 pb-px cursor-pointer select-none hover:border-neutral-400 transition-colors",
-        className,
+    <div ref={wrapRef} className="relative inline-block">
+      <span
+        onClick={openPicker}
+        className={cn(
+          "text-xs text-neutral-700 border-b border-neutral-200 pb-px cursor-pointer select-none hover:border-neutral-400 transition-colors",
+          className,
+        )}
+      >
+        {label ?? fmtDateInput(value)}
+      </span>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-neutral-100 rounded-xl shadow-lg p-3 w-56">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={prevMonth}
+              className="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded transition-colors text-base leading-none"
+            >
+              ‹
+            </button>
+            <span className="text-xs font-medium text-neutral-700">
+              {monthName} {viewYear}
+            </span>
+            <button
+              onClick={nextMonth}
+              className="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded transition-colors text-base leading-none"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 mb-1">
+            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+              <div key={i} className="text-center text-[10px] text-neutral-400 py-0.5">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-y-0.5">
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e-${i}`} />;
+              const dateStr = toStr(viewYear, viewMonth, day);
+              const selected = dateStr === value;
+              const disabled = Boolean((min && dateStr < min) || (max && dateStr > max));
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => { if (!disabled) { onChange(dateStr); setOpen(false); } }}
+                  className={cn(
+                    "text-xs rounded py-1 transition-colors leading-none",
+                    selected ? "bg-neutral-900 text-white"
+                      : disabled ? "text-neutral-200 cursor-not-allowed"
+                      : "text-neutral-700 hover:bg-neutral-100",
+                  )}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
-    >
-      {label ?? fmtDateInput(value)}
-      <input
-        ref={ref}
-        type="date"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(e) => onChange(e.target.value)}
-        className="sr-only"
-      />
-    </span>
+    </div>
   );
 }
 
@@ -284,11 +390,13 @@ function MetricChart({
 
 // ─── Workload sort / group helpers ────────────────────────────────────────────
 
-type WorkloadSort = "name" | "samples" | "kind" | "namespace";
+type WorkloadSort = "name" | "savings" | "status" | "samples" | "kind" | "namespace";
 type SortDir = "asc" | "desc";
 
 const WORKLOAD_SORT_OPTIONS: { label: string; value: WorkloadSort }[] = [
   { label: "Name", value: "name" },
+  { label: "Savings", value: "savings" },
+  { label: "Status", value: "status" },
   { label: "Samples", value: "samples" },
   { label: "Workload type", value: "kind" },
   { label: "Group", value: "namespace" },
@@ -296,11 +404,22 @@ const WORKLOAD_SORT_OPTIONS: { label: string; value: WorkloadSort }[] = [
 
 const GROUPED_SORTS: WorkloadSort[] = ["kind", "namespace"];
 
+const STATUS_ORDER: Record<string, number> = {
+  WASTEFUL: 0,
+  UNDER_PROVISIONED: 1,
+  MIXED: 2,
+  OPTIMAL: 3,
+  UNBOUNDED: 4,
+  INSUFFICIENT_DATA: 5,
+};
+
 type Sortable = {
   name: string;
   namespace: string;
   kind: string;
   sample_count: number;
+  status?: string;
+  monthly_savings?: number;
 };
 
 function sortItems<T extends Sortable>(
@@ -325,6 +444,13 @@ function sortItems<T extends Sortable>(
           (a.namespace.localeCompare(b.namespace) ||
             a.name.localeCompare(b.name))
         );
+      case "status": {
+        const oa = STATUS_ORDER[a.status ?? ""] ?? 99;
+        const ob = STATUS_ORDER[b.status ?? ""] ?? 99;
+        return m * (oa - ob || a.name.localeCompare(b.name));
+      }
+      case "savings":
+        return m * ((a.monthly_savings ?? 0) - (b.monthly_savings ?? 0));
     }
   });
 }
@@ -358,16 +484,20 @@ function isWorkloadStale(lastSeenAt: string | null): boolean {
 // ─── WorkloadRow / PendingRow ─────────────────────────────────────────────────
 
 const STATUS_STYLE: Record<WorkloadRecommendation["status"], string> = {
-  WASTEFUL: "text-rose-500 bg-rose-50",
+  WASTEFUL:          "text-rose-500 bg-rose-50",
   UNDER_PROVISIONED: "text-amber-600 bg-amber-50",
-  OPTIMAL: "text-emerald-600 bg-emerald-50",
+  OPTIMAL:           "text-emerald-600 bg-emerald-50",
+  MIXED:             "text-orange-500 bg-orange-50",
+  UNBOUNDED:         "text-violet-600 bg-violet-50",
   INSUFFICIENT_DATA: "text-neutral-400 bg-neutral-100",
 };
 
 const STATUS_LABEL: Record<WorkloadRecommendation["status"], string> = {
-  WASTEFUL: "Wasteful",
+  WASTEFUL:          "Wasteful",
   UNDER_PROVISIONED: "Under-prov.",
-  OPTIMAL: "Optimal",
+  OPTIMAL:           "Optimal",
+  MIXED:             "Mixed",
+  UNBOUNDED:         "No requests",
   INSUFFICIENT_DATA: "Insuff. data",
 };
 
@@ -382,6 +512,7 @@ function WorkloadRow({
   clusterId: number;
   isNew?: boolean;
 }) {
+  const fmt = useFormatCurrency()
   const stale = isWorkloadStale(workload.last_seen_at);
   return (
     <Link
@@ -416,26 +547,28 @@ function WorkloadRow({
       </div>
       <div className="text-right shrink-0 w-36">
         <p className="text-xs text-neutral-400 mb-0.5">CPU</p>
-        <p className="text-xs text-neutral-700">
-          <span className="text-neutral-400 line-through mr-1">
-            {workload.cpu_request_current}
-          </span>
-          {workload.cpu_recommended}
+        <p className="text-xs flex items-center justify-end gap-1">
+          {workload.cpu_status === "UNBOUNDED"
+            ? <span className="text-neutral-400">—</span>
+            : <span className="text-rose-400 line-through">{fmtCpu(workload.cpu_request_current)}</span>}
+          <span className="text-neutral-300">→</span>
+          <span className="text-emerald-600">{fmtCpu(workload.cpu_recommended)}</span>
         </p>
       </div>
       <div className="text-right shrink-0 w-36">
         <p className="text-xs text-neutral-400 mb-0.5">RAM</p>
-        <p className="text-xs text-neutral-700">
-          <span className="text-neutral-400 line-through mr-1">
-            {workload.ram_request_current}
-          </span>
-          {workload.ram_recommended}
+        <p className="text-xs flex items-center justify-end gap-1">
+          {workload.ram_status === "UNBOUNDED"
+            ? <span className="text-neutral-400">—</span>
+            : <span className="text-rose-400 line-through">{fmtRam(workload.ram_request_current)}</span>}
+          <span className="text-neutral-300">→</span>
+          <span className="text-emerald-600">{fmtRam(workload.ram_recommended)}</span>
         </p>
       </div>
       <div className="text-right shrink-0 w-24">
         <p className="text-xs text-neutral-400 mb-0.5">Savings</p>
         <p className="text-xs font-semibold text-emerald-600">
-          {formatCurrency(workload.monthly_savings)}/mo
+          {workload.status === "UNBOUNDED" ? "—" : `${fmt(workload.monthly_savings)}/mo`}
         </p>
       </div>
       <div className="shrink-0 w-24 text-right">
@@ -533,7 +666,12 @@ function PendingRow({
 export default function ClusterPage() {
   const { id, cid } = useParams<{ id: string; cid: string }>();
   const currentUser = currentUserFromToken();
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>("7d");
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
+    const s = localStorage.getItem("time_window");
+    return (["1d", "7d", "30d"] as TimeWindow[]).includes(s as TimeWindow)
+      ? (s as TimeWindow)
+      : "7d";
+  });
   const [granularity, setGranularity] = useState<GranularityView>("hour");
   const [dayMode, setDayMode] = useState<"all" | "range">("all");
   const [workloadSort, setWorkloadSort] = useState<WorkloadSort>(() => {
@@ -550,6 +688,12 @@ export default function ClusterPage() {
   const [rangeFrom, setRangeFrom] = useState(() => daysAgoStr(7));
   const [rangeTo, setRangeTo] = useState(() => todayStr());
 
+  function navigateDay(dir: -1 | 1) {
+    const d = new Date(hourDay + "T00:00:00");
+    d.setDate(d.getDate() + dir);
+    setHourDay(localDateStr(d));
+  }
+
   const customerId = Number(id);
   const clusterId = Number(cid);
 
@@ -557,7 +701,7 @@ export default function ClusterPage() {
     if (granularity === "hour") {
       const d = new Date(hourDay + "T00:00:00");
       const isToday = hourDay === todayStr();
-      const to = isToday ? new Date() : new Date(d.getTime() + 86_400_000);
+      const to = isToday ? new Date() : new Date(d.getTime() + 86_400_000 + 3_600_000);
       return { from: d.toISOString(), to: to.toISOString() };
     }
     if (dayMode === "range" && rangeFrom && rangeTo) {
@@ -576,6 +720,7 @@ export default function ClusterPage() {
     [customerId, clusterId, dateRange, granularity],
   );
 
+  const fmt = useFormatCurrency()
   const summary = useClusterSummary(customerId, clusterId, timeWindow);
   const metrics = useClusterMetrics(metricsParams);
   const recommendations = useClusterRecommendations(
@@ -584,9 +729,9 @@ export default function ClusterPage() {
     timeWindow,
   );
 
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -631,7 +776,7 @@ export default function ClusterPage() {
         if (prev !== undefined && count > prev) flashing.push(id);
       }
       if (flashing.length > 0) {
-        setFlashingSamples(new Set(flashing));
+        startTransition(() => setFlashingSamples(new Set(flashing)));
         const t = setTimeout(() => setFlashingSamples(new Set()), 1100);
         prevSampleCountsRef.current = current;
         return () => clearTimeout(t);
@@ -681,22 +826,27 @@ export default function ClusterPage() {
         localStorage.removeItem(key);
       }
     }
-    setCachedOffline(offline);
+    startTransition(() => setCachedOffline(offline));
   }, [recommendations.data, clusterId, currentUser]);
 
   const chartData = useMemo<ChartPoint[]>(
-    () =>
-      (metrics.data?.points ?? []).map((p) => ({
-        ...p,
-        ts_ms: new Date(p.ts).getTime(),
-      })),
-    [metrics.data],
+    () => {
+      const points = metrics.data?.points ?? [];
+      if (granularity === "hour") {
+        const dayEnd = new Date(hourDay + "T00:00:00").getTime() + 86_400_000;
+        return points
+          .filter((p) => new Date(p.ts).getTime() <= dayEnd)
+          .map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
+      }
+      return points.map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
+    },
+    [metrics.data, granularity, hourDay],
   );
 
   const xDomain = useMemo((): [number | string, number | string] => {
     if (granularity === "hour") {
       const d = new Date(hourDay + "T00:00:00");
-      return [d.getTime(), d.getTime() + 86_400_000];
+      return [d.getTime(), d.getTime() + 86_400_000 + 1];
     }
     if (dayMode === "range" && rangeFrom && rangeTo) {
       return [
@@ -708,7 +858,7 @@ export default function ClusterPage() {
   }, [granularity, hourDay, dayMode, rangeFrom, rangeTo]);
 
   const futureFromMs =
-    granularity === "hour" && hourDay === todayStr() ? Date.now() : undefined;
+    granularity === "hour" && hourDay === todayStr() ? now : undefined;
 
   const hourTicks = useMemo(() => {
     if (granularity !== "hour") return undefined;
@@ -744,13 +894,17 @@ export default function ClusterPage() {
   const lostFromCache = cachedOffline.filter(
     (e) =>
       e.data.last_seen_at != null &&
-      Date.now() - new Date(e.data.last_seen_at).getTime() <= 15 * 60_000,
+      now - new Date(e.data.last_seen_at).getTime() <= 15 * 60_000,
   );
-  const outOfRecsFromCache = cachedOffline.filter(
-    (e) =>
-      !e.data.last_seen_at ||
-      Date.now() - new Date(e.data.last_seen_at).getTime() > 15 * 60_000,
-  );
+
+  const allLostWorkloads = [
+    ...lostWorkloads,
+    ...lostFromCache.filter((e) => e.kind === 'workload').map((e) => e.data as WorkloadRecommendation),
+  ]
+  const allLostPending = [
+    ...lostPending,
+    ...lostFromCache.filter((e) => e.kind === 'pending').map((e) => e.data as PendingWorkload),
+  ]
 
   if (
     !id ||
@@ -783,7 +937,10 @@ export default function ClusterPage() {
           </h1>
           {summary.data && (
             <>
-              <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded">
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded font-medium",
+                PROVIDER_STYLE[summary.data.provider] ?? "text-neutral-400 bg-neutral-100",
+              )}>
                 {summary.data.provider}
               </span>
               <span
@@ -808,24 +965,11 @@ export default function ClusterPage() {
                 />
                 {summary.data.status}
               </span>
+              <span className="text-xs text-neutral-400">
+                updated {fmtRelativeTime(summary.data.generated_at, now)}
+              </span>
             </>
           )}
-        </div>
-        <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
-          {TIME_WINDOWS.map(({ label, value }) => (
-            <button
-              key={value}
-              onClick={() => setTimeWindow(value)}
-              className={cn(
-                "px-3 py-1 rounded-md text-xs font-medium transition-colors",
-                timeWindow === value
-                  ? "bg-white text-neutral-900 shadow-sm"
-                  : "text-neutral-400 hover:text-neutral-700",
-              )}
-            >
-              {label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -846,68 +990,111 @@ export default function ClusterPage() {
 
       {/* Stats skeleton */}
       {summary.isLoading && (
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white border border-neutral-100 rounded-xl p-6 animate-pulse"
-            >
-              <div className="h-3 w-24 bg-neutral-100 rounded mb-3" />
-              <div className="h-7 w-32 bg-neutral-100 rounded" />
-            </div>
-          ))}
+        <div className="border border-neutral-100 rounded-xl mb-8 animate-pulse">
+          <div className="px-6 py-3 border-b border-neutral-100">
+            <div className="h-3 w-24 bg-neutral-100 rounded" />
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-neutral-100">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-6">
+                <div className="h-3 w-24 bg-neutral-100 rounded mb-3" />
+                <div className="h-7 w-32 bg-neutral-100 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Stats cards */}
       {summary.data && (
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white border border-neutral-100 rounded-xl p-6">
-            <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-              Monthly Spend
-            </p>
-            <p className="text-2xl font-semibold text-neutral-900">
-              <AnimatedCurrency value={summary.data.monthly_cost_current} />
-              <span className="text-sm font-normal text-neutral-400 ml-1">
-                /mo
-              </span>
-            </p>
+        <div className="border border-neutral-100 rounded-xl mb-8">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
+            <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Cost Overview</p>
+            <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+              {TIME_WINDOWS.map(({ label, value, diagnostic }) => (
+                <button
+                  key={value}
+                  onClick={() => {
+                    setTimeWindow(value);
+                    localStorage.setItem("time_window", value);
+                  }}
+                  className={cn(
+                    "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+                    timeWindow === value && diagnostic
+                      ? "bg-amber-50 text-amber-700 shadow-sm"
+                      : timeWindow === value
+                      ? "bg-white text-neutral-900 shadow-sm"
+                      : "text-neutral-400 hover:text-neutral-700",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="bg-white border border-neutral-100 rounded-xl p-6">
-            <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-              Recommended
-            </p>
-            <p className="text-2xl font-semibold text-neutral-900">
-              <AnimatedCurrency value={summary.data.monthly_cost_recommended} />
-              <span className="text-sm font-normal text-neutral-400 ml-1">
-                /mo
-              </span>
-            </p>
-          </div>
-          <div className="bg-white border border-neutral-100 rounded-xl p-6">
-            <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-              Monthly Savings
-            </p>
-            <p className="text-2xl font-semibold text-emerald-600">
-              <AnimatedCurrency value={summary.data.monthly_savings} />
-              <span className="text-sm font-normal text-neutral-400 ml-1">
-                /mo
-              </span>
-            </p>
-            <p className="text-xs text-neutral-400 mt-1">
-              {formatSavingsPercent(
-                summary.data.monthly_cost_current,
-                summary.data.monthly_savings,
-              )}{" "}
-              reduction
-            </p>
-            {summary.data.workload_breakdown.insufficient_data > 0 && (
-              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 inline-block shrink-0" />
-                {summary.data.workload_breakdown.insufficient_data} insufficient
-                data
+          {timeWindow === "1d" && (
+            <div className="flex items-center gap-2 px-6 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
+              <span className="font-medium">Diagnostic view</span>
+              <span className="text-amber-400">·</span>
+              <span>Low data thresholds — not recommended for production rightsizing decisions</span>
+            </div>
+          )}
+          <div className="grid grid-cols-3 divide-x divide-neutral-100">
+            <div className="p-6">
+              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
+                Monthly Spend
               </p>
-            )}
+              <p className="text-2xl font-semibold text-neutral-900">
+                <AnimatedCurrency value={summary.data.monthly_cost_current} />
+                <span className="text-sm font-normal text-neutral-400 ml-1">
+                  /mo
+                </span>
+              </p>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
+                Recommended
+              </p>
+              <p className="text-2xl font-semibold text-neutral-900">
+                <AnimatedCurrency value={summary.data.monthly_cost_recommended} />
+                <span className="text-sm font-normal text-neutral-400 ml-1">
+                  /mo
+                </span>
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide">
+                  {savingsLabel(timeWindow)}
+                </p>
+                <div className="relative group/tip">
+                  <Info size={11} className="text-neutral-300 cursor-default" />
+                  <div className="absolute bottom-full left-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
+                    Projected monthly savings based on <span className="font-medium">{timeWindow}</span> of usage data. Recent changes to workload behavior may take a full {timeWindow} window to be reflected.
+                  </div>
+                </div>
+              </div>
+              <p className="text-2xl font-semibold text-emerald-600">
+                <AnimatedCurrency value={summary.data.monthly_savings} />
+                <span className="text-sm font-normal text-neutral-400 ml-1">
+                  /mo
+                </span>
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">
+                {formatSavingsPercent(
+                  summary.data.monthly_cost_current,
+                  summary.data.monthly_savings,
+                )}{" "}
+                reduction
+              </p>
+              {summary.data.workload_breakdown.insufficient_data > 0 && (
+                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 inline-block shrink-0" />
+                  {summary.data.workload_breakdown.insufficient_data} insufficient
+                  data
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -925,6 +1112,18 @@ export default function ClusterPage() {
             <span className="flex items-center gap-1.5 text-xs text-neutral-500">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-300 inline-block" />
               {wb.under_provisioned} under-provisioned
+            </span>
+          )}
+          {wb.mixed > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
+              {wb.mixed} mixed
+            </span>
+          )}
+          {wb.unbounded > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
+              {wb.unbounded} no requests
             </span>
           )}
           {wb.optimal > 0 && (
@@ -967,13 +1166,26 @@ export default function ClusterPage() {
         </div>
 
         {granularity === "hour" && (
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-2 mb-5">
+            <button
+              onClick={() => navigateDay(-1)}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:border-neutral-300 transition-colors"
+            >
+              <ArrowLeft size={12} />
+            </button>
             <DatePicker
               value={hourDay}
               max={todayStr()}
               onChange={setHourDay}
               label={hourDay === todayStr() ? "Today" : undefined}
             />
+            <button
+              onClick={() => navigateDay(1)}
+              disabled={hourDay >= todayStr()}
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:border-neutral-300 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <ArrowRight size={12} />
+            </button>
           </div>
         )}
 
@@ -992,6 +1204,7 @@ export default function ClusterPage() {
             </button>
             <span className="text-neutral-200 select-none">·</span>
             <div
+              onClick={() => setDayMode("range")}
               className={cn(
                 "flex items-center gap-2 transition-opacity",
                 dayMode === "range"
@@ -1029,8 +1242,8 @@ export default function ClusterPage() {
           </div>
         )}
 
-        {metrics.data && chartData.length > 0 && (
-          <div className="space-y-8">
+        {metrics.data && (
+          <div className={cn("relative z-0 space-y-8 transition-opacity duration-300", metrics.isFetching ? "opacity-40" : "opacity-100")}>
             <MetricChart
               data={chartData}
               dataKey="cpu_cores"
@@ -1055,13 +1268,10 @@ export default function ClusterPage() {
               accent={granularity === "hour"}
               futureFrom={futureFromMs}
             />
+            {chartData.length === 0 && (
+              <p className="text-xs text-neutral-400">No metrics data for this period.</p>
+            )}
           </div>
-        )}
-
-        {metrics.data && chartData.length === 0 && (
-          <p className="text-sm text-neutral-400">
-            No metrics data for this period.
-          </p>
         )}
         {metrics.error && (
           <p className="text-sm text-red-400">Failed to load metrics.</p>
@@ -1079,8 +1289,7 @@ export default function ClusterPage() {
             {recommendations.data &&
               recommendations.data.total_monthly_savings > 0 && (
                 <span className="text-xs text-emerald-600 font-medium">
-                  {formatCurrency(recommendations.data.total_monthly_savings)}
-                  /mo total savings
+                  {fmt(recommendations.data.total_monthly_savings)}/mo total savings
                 </span>
               )}
             <div className="flex items-center gap-2">
@@ -1161,6 +1370,7 @@ export default function ClusterPage() {
                         customerId={customerId}
                         clusterId={clusterId}
                         isNew={newIds.has(w.workload_id)}
+                        timeWindow={timeWindow}
                       />
                     ))}
                   </div>
@@ -1176,6 +1386,7 @@ export default function ClusterPage() {
                   customerId={customerId}
                   clusterId={clusterId}
                   isNew={newIds.has(w.workload_id)}
+                  timeWindow={timeWindow}
                 />
               ))}
             </div>
@@ -1184,8 +1395,7 @@ export default function ClusterPage() {
         {recommendations.data &&
           activeWorkloads.length === 0 &&
           lostWorkloads.length === 0 &&
-          lostFromCache.length === 0 &&
-          outOfRecsFromCache.length === 0 && (
+          lostFromCache.length === 0 && (
             <p className="text-sm text-neutral-400">
               No recommendations for this window.
             </p>
@@ -1241,93 +1451,90 @@ export default function ClusterPage() {
       )}
 
       {/* Lost Connection — reporting stopped >1 min ago, backend still tracking */}
-      {(lostWorkloads.length > 0 ||
-        lostPending.length > 0 ||
-        lostFromCache.length > 0) && (
+      {(allLostWorkloads.length > 0 || allLostPending.length > 0) && (
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
               Lost Connection ·{" "}
-              {lostWorkloads.length + lostPending.length + lostFromCache.length}
+              {allLostWorkloads.length + allLostPending.length}
             </h2>
             <span className="text-xs text-neutral-400">
               no data in 1 min · removed from recommendations after 15 min
             </span>
           </div>
-          <div className="bg-white border border-rose-100 rounded-xl divide-y divide-neutral-100 opacity-60">
-            {sortItems(lostWorkloads, workloadSort, sortDir).map((w) => (
-              <WorkloadRow
-                key={w.workload_id}
-                workload={w}
-                customerId={customerId}
-                clusterId={clusterId}
-              />
-            ))}
-            {sortItems(lostPending, workloadSort, sortDir).map((w) => (
-              <PendingRow
-                key={w.workload_id}
-                workload={w}
-                flashSample={flashingSamples.has(w.workload_id)}
-                muted
-              />
-            ))}
-            {lostFromCache
-              .filter((e) => e.kind === "workload")
-              .map((e) => (
+          {GROUPED_SORTS.includes(workloadSort) ? (
+            <div className="space-y-5">
+              {allLostWorkloads.length > 0 &&
+                groupBy(
+                  sortItems(allLostWorkloads, workloadSort, sortDir),
+                  sectionKey(workloadSort),
+                  sortDir,
+                ).map(([section, items]) => (
+                  <div key={section}>
+                    <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">
+                      {section.charAt(0).toUpperCase() + section.slice(1)}
+                    </p>
+                    <div className="bg-white border border-rose-100 rounded-xl divide-y divide-neutral-100 opacity-60">
+                      {items.map((w) => (
+                        <WorkloadRow
+                          key={w.workload_id}
+                          workload={w}
+                          customerId={customerId}
+                          clusterId={clusterId}
+                          timeWindow={timeWindow}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              {allLostPending.length > 0 &&
+                groupBy(
+                  sortItems(allLostPending, workloadSort, sortDir),
+                  sectionKey(workloadSort),
+                  sortDir,
+                ).map(([section, items]) => (
+                  <div key={`pending-${section}`}>
+                    <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">
+                      Pending ·{" "}
+                      {section.charAt(0).toUpperCase() + section.slice(1)}
+                    </p>
+                    <div className="bg-white border border-rose-100 rounded-xl divide-y divide-neutral-100 opacity-60">
+                      {items.map((w) => (
+                        <PendingRow
+                          key={w.workload_id}
+                          workload={w}
+                          flashSample={flashingSamples.has(w.workload_id)}
+                          muted
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-rose-100 rounded-xl divide-y divide-neutral-100 opacity-60">
+              {sortItems(allLostWorkloads, workloadSort, sortDir).map((w) => (
                 <WorkloadRow
-                  key={e.data.workload_id}
-                  workload={e.data as WorkloadRecommendation}
+                  key={w.workload_id}
+                  workload={w}
                   customerId={customerId}
                   clusterId={clusterId}
+                  timeWindow={timeWindow}
                 />
               ))}
-            {lostFromCache
-              .filter((e) => e.kind === "pending")
-              .map((e) => (
+              {sortItems(allLostPending, workloadSort, sortDir).map((w) => (
                 <PendingRow
-                  key={e.data.workload_id}
-                  workload={e.data as PendingWorkload}
+                  key={w.workload_id}
+                  workload={w}
+                  flashSample={flashingSamples.has(w.workload_id)}
                   muted
                 />
               ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Out of Recommendations — backend has stopped reporting, tracking resumes within 7 days */}
-      {outOfRecsFromCache.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
-              Out of Recommendations · {outOfRecsFromCache.length}
-            </h2>
-            <span className="text-xs text-neutral-400">
-              excluded by backend · tracking resumes if seen within 7 days
-            </span>
-          </div>
-          <div className="bg-white border border-neutral-100 rounded-xl divide-y divide-neutral-100 opacity-40">
-            {outOfRecsFromCache
-              .filter((e) => e.kind === "workload")
-              .map((e) => (
-                <WorkloadRow
-                  key={e.data.workload_id}
-                  workload={e.data as WorkloadRecommendation}
-                  customerId={customerId}
-                  clusterId={clusterId}
-                />
-              ))}
-            {outOfRecsFromCache
-              .filter((e) => e.kind === "pending")
-              .map((e) => (
-                <PendingRow
-                  key={e.data.workload_id}
-                  workload={e.data as PendingWorkload}
-                  muted
-                />
-              ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

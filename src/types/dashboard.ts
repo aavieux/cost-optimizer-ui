@@ -8,6 +8,8 @@ export type WorkloadBreakdown = {
   wasteful: number
   optimal: number
   under_provisioned: number
+  mixed: number
+  unbounded: number
   insufficient_data: number
   loading: number
 }

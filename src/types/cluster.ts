@@ -47,7 +47,9 @@ export type WorkloadRecommendation = {
   monthly_cost_current: number
   monthly_cost_recommended: number
   monthly_savings: number
-  status: 'WASTEFUL' | 'OPTIMAL' | 'UNDER_PROVISIONED' | 'INSUFFICIENT_DATA'
+  status: 'WASTEFUL' | 'OPTIMAL' | 'UNDER_PROVISIONED' | 'MIXED' | 'INSUFFICIENT_DATA' | 'UNBOUNDED'
+  cpu_status: 'WASTEFUL' | 'UNDER_PROVISIONED' | 'OPTIMAL' | 'UNBOUNDED'
+  ram_status: 'WASTEFUL' | 'UNDER_PROVISIONED' | 'OPTIMAL' | 'UNBOUNDED'
   stability: 'STABLE' | 'VARIABLE'
   sample_count: number
 }

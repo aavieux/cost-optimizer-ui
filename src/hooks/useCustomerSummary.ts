@@ -8,8 +8,7 @@ export function useCustomerSummary(customerId: number, timeWindow: TimeWindow) {
     queryKey: ['customer', customerId, timeWindow],
     queryFn: () =>
       api.get<CustomerSummary>(`/customers/${customerId}/summary?window=${timeWindow}`).then((r) => r.data),
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
     retry: false,
     enabled: customerId > 0,
   })
