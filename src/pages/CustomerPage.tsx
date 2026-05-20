@@ -1,24 +1,33 @@
 import { useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCustomerSummary } from '@/hooks/useCustomerSummary'
-import { formatCurrency, formatSavingsPercent } from '@/lib/format'
+import { formatSavingsPercent } from '@/lib/format'
+import { useFormatCurrency } from '@/context/CurrencyContext'
 import AnimatedCurrency from '@/components/AnimatedCurrency'
 import { getErrorCode } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { TimeWindow } from '@/types/dashboard'
 import type { ClusterSummary } from '@/types/customer'
 
+function savingsLabel(window: TimeWindow): string {
+  if (window === '7d') return 'Weekly Savings'
+  return 'Monthly Savings'
+}
+
 const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
-  { label: '1d', value: '1d' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
 ]
 
-function ClusterRow({ cluster }: { cluster: ClusterSummary }) {
+function ClusterRow({ cluster, customerId }: { cluster: ClusterSummary; customerId: number }) {
+  const fmt = useFormatCurrency()
   const wb = cluster.workload_breakdown
   return (
-    <div className="flex items-center justify-between px-6 py-4">
+    <Link
+      to={`/customers/${customerId}/clusters/${cluster.cluster_id}`}
+      className="flex items-center justify-between px-6 py-4 hover:bg-neutral-50 transition-colors group"
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-neutral-900">{cluster.name}</span>
@@ -54,6 +63,12 @@ function ClusterRow({ cluster }: { cluster: ClusterSummary }) {
               {wb.under_provisioned} under-provisioned
             </span>
           )}
+          {wb.mixed > 0 && (
+            <span className="text-xs text-neutral-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 mr-1" />
+              {wb.mixed} mixed
+            </span>
+          )}
           {wb.optimal > 0 && (
             <span className="text-xs text-neutral-400">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1" />
@@ -66,25 +81,31 @@ function ClusterRow({ cluster }: { cluster: ClusterSummary }) {
         <div>
           <p className="text-xs text-neutral-400 mb-0.5">Current</p>
           <p className="text-sm font-medium text-neutral-900">
-            {formatCurrency(cluster.monthly_cost_current)}
+            {fmt(cluster.monthly_cost_current)}
             <span className="text-xs font-normal text-neutral-400">/mo</span>
           </p>
         </div>
         <div>
           <p className="text-xs text-neutral-400 mb-0.5">Savings</p>
           <p className="text-sm font-semibold text-emerald-600">
-            {formatCurrency(cluster.monthly_savings)}
+            {fmt(cluster.monthly_savings)}
             <span className="text-xs font-normal text-neutral-400">/mo</span>
           </p>
         </div>
+        <ArrowRight size={14} className="text-neutral-300 group-hover:text-neutral-600 transition-colors" />
       </div>
-    </div>
+    </Link>
   )
 }
 
 export default function CustomerPage() {
   const { id } = useParams<{ id: string }>()
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d')
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
+    const s = localStorage.getItem('time_window')
+    return (['7d', '30d'] as TimeWindow[]).includes(s as TimeWindow)
+      ? (s as TimeWindow)
+      : '7d'
+  })
   const customerId = Number(id)
   const { data, isLoading, error } = useCustomerSummary(customerId, timeWindow)
 
@@ -100,27 +121,9 @@ export default function CustomerPage() {
         Customers
       </Link>
 
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold text-neutral-900">
-          {data?.customer_name ?? (isLoading ? '—' : 'Customer')}
-        </h1>
-        <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
-          {TIME_WINDOWS.map(({ label, value }) => (
-            <button
-              key={value}
-              onClick={() => setTimeWindow(value)}
-              className={cn(
-                'px-3 py-1 rounded-md text-xs font-medium transition-colors',
-                timeWindow === value
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-400 hover:text-neutral-700'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <h1 className="text-xl font-semibold text-neutral-900 mb-8">
+        {data?.customer_name ?? (isLoading ? '—' : 'Customer')}
+      </h1>
 
       {error && (
         <div className="mb-8 px-4 py-3 rounded-lg bg-red-50 border border-red-100">
@@ -137,42 +140,71 @@ export default function CustomerPage() {
       )}
 
       {isLoading && (
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white border border-neutral-100 rounded-xl p-6 animate-pulse">
-              <div className="h-3 w-24 bg-neutral-100 rounded mb-3" />
-              <div className="h-7 w-32 bg-neutral-100 rounded" />
-            </div>
-          ))}
+        <div className="border border-neutral-100 rounded-xl mb-8 animate-pulse">
+          <div className="px-6 py-3 border-b border-neutral-100">
+            <div className="h-3 w-24 bg-neutral-100 rounded" />
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-neutral-100">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-6">
+                <div className="h-3 w-24 bg-neutral-100 rounded mb-3" />
+                <div className="h-7 w-32 bg-neutral-100 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {data && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-white border border-neutral-100 rounded-xl p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Spend</p>
-              <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={data.monthly_cost_current} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
-              </p>
+          <div className="bg-white border border-neutral-100 rounded-xl mb-8">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
+              <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Cost Overview</p>
+              <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
+                {TIME_WINDOWS.map(({ label, value }) => (
+                  <button
+                    key={value}
+                    onClick={() => {
+                      setTimeWindow(value)
+                      localStorage.setItem('time_window', value)
+                    }}
+                    className={cn(
+                      'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                      timeWindow === value
+                        ? 'bg-[#2563AF]/10 text-[#2563AF]'
+                        : 'text-neutral-400 hover:text-neutral-700'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="bg-white border border-neutral-100 rounded-xl p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Recommended</p>
-              <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={data.monthly_cost_recommended} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
-              </p>
-            </div>
-            <div className="bg-white border border-neutral-100 rounded-xl p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Savings</p>
-              <p className="text-2xl font-semibold text-emerald-600">
-                <AnimatedCurrency value={data.monthly_savings} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
-              </p>
-              <p className="text-xs text-neutral-400 mt-1">
-                {formatSavingsPercent(data.monthly_cost_current, data.monthly_savings)} reduction
-              </p>
+            <div className="grid grid-cols-3 divide-x divide-neutral-100">
+              <div className="p-6">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Spend</p>
+                <p className="text-2xl font-semibold text-neutral-900">
+                  <AnimatedCurrency value={data.monthly_cost_current} />
+                  <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
+                </p>
+              </div>
+              <div className="p-6">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Recommended</p>
+                <p className="text-2xl font-semibold text-neutral-900">
+                  <AnimatedCurrency value={data.monthly_cost_recommended} />
+                  <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
+                </p>
+              </div>
+              <div className="p-6">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">{savingsLabel(timeWindow)}</p>
+                <p className="text-2xl font-semibold text-emerald-600">
+                  <AnimatedCurrency value={data.monthly_savings} />
+                  <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
+                </p>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {formatSavingsPercent(data.monthly_cost_current, data.monthly_savings)} reduction
+                </p>
+              </div>
             </div>
           </div>
 
@@ -208,7 +240,7 @@ export default function CustomerPage() {
             ) : (
               <div className="bg-white border border-neutral-100 rounded-xl divide-y divide-neutral-100">
                 {data.clusters.map((cluster) => (
-                  <ClusterRow key={cluster.cluster_id} cluster={cluster} />
+                  <ClusterRow key={cluster.cluster_id} cluster={cluster} customerId={data.customer_id} />
                 ))}
               </div>
             )}

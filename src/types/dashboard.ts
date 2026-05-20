@@ -8,6 +8,8 @@ export type WorkloadBreakdown = {
   wasteful: number
   optimal: number
   under_provisioned: number
+  mixed: number
+  unbounded: number
   insufficient_data: number
   loading: number
 }
@@ -35,4 +37,4 @@ export type DashboardResponse = {
   generated_at: string
 }
 
-export type TimeWindow = '1d' | '7d' | '30d'
+export type TimeWindow = '1d' | '7d' | '30d' | '90d'

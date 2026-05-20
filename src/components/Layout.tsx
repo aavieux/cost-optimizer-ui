@@ -2,6 +2,8 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Building2, Server, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
+import { useCurrency } from '@/context/CurrencyContext'
+import Logo from '@/assets/logo.svg?react'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -12,6 +14,7 @@ const NAV_ITEMS = [
 export default function Layout() {
   const navigate = useNavigate()
   const username = localStorage.getItem('username')
+  const { currency, setCurrency } = useCurrency()
 
   async function handleLogout() {
     try {
@@ -27,12 +30,10 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen bg-neutral-50">
       {/* Sidebar */}
-      <aside className="fixed top-0 left-0 h-full w-52 bg-white border-r border-neutral-100 flex flex-col z-10">
+      <aside className="fixed top-0 left-0 h-full w-52 bg-white flex flex-col z-10 border-r border-neutral-100">
         {/* Brand */}
-        <div className="px-5 h-14 flex items-center border-b border-neutral-100">
-          <span className="text-sm font-semibold tracking-tight text-neutral-900">
-            Cost Optimizer
-          </span>
+        <div className="h-14 flex items-center justify-center border-b border-neutral-100">
+          <Logo className="h-10 w-auto" aria-label="Logo" />
         </div>
 
         {/* Navigation */}
@@ -46,7 +47,7 @@ export default function Layout() {
                 cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
                   isActive
-                    ? 'bg-neutral-100 text-neutral-900 font-medium'
+                    ? 'bg-gradient-to-r from-[#2563AF]/10 to-[#5AC9E9]/10 text-[#2563AF] font-medium'
                     : 'text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50'
                 )
               }
@@ -62,6 +63,22 @@ export default function Layout() {
           {username && (
             <p className="text-xs text-neutral-400 px-1 truncate">{username}</p>
           )}
+          <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+            {(['USD', 'EUR'] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => setCurrency(c)}
+                className={cn(
+                  'flex-1 py-1 rounded-md text-xs font-medium transition-colors',
+                  currency === c
+                    ? 'bg-[#2563AF]/10 text-[#2563AF]'
+                    : 'text-neutral-400 hover:text-neutral-700',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-sm text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 transition-colors"

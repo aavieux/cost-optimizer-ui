@@ -9,6 +9,7 @@ import type { LoginResponse } from '@/types/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Logo from '@/assets/logo.svg?react'
 
 const loginSchema = z.object({
   username: z
@@ -66,20 +67,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-10">
+    <div className="min-h-screen flex items-center justify-center px-6 bg-neutral-50">
 
-        {/* Header */}
-        <div className="space-y-1 text-center">
-          <p className="text-xs tracking-widest text-neutral-400 uppercase">
-            Kubernetes Cost Intelligence
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
-            Cost Optimizer
-          </h1>
-          <p className="text-sm text-neutral-400 pt-1">
-            Sign in to your account
-          </p>
+      {/* Card */}
+      <div className="w-full max-w-sm rounded-2xl border border-white/80 bg-white/65 backdrop-blur-xl px-8 py-10 space-y-8"
+        style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.08), 0 2px 8px 0 rgba(0,0,0,0.06), 0 32px 64px -12px rgba(0,0,0,0.10)' }}
+      >
+
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-3">
+          <Logo className="h-24 w-auto" aria-label="Cloud Zenith" />
+          <span className="text-xl font-bold tracking-[0.28em] uppercase text-neutral-900">
+            Cloud Zenith
+          </span>
         </div>
 
         {/* Form */}
@@ -95,7 +95,7 @@ export default function LoginPage() {
               maxLength={64}
               {...register('username')}
               aria-invalid={!!errors.username}
-              className="border-neutral-200 focus-visible:ring-0 focus-visible:border-neutral-900 transition-colors rounded-lg"
+              className="bg-white border-neutral-200 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:border-neutral-200 focus-visible:shadow-sm transition-colors rounded-lg"
             />
             {errors.username && (
               <p className="text-xs text-red-500">{errors.username.message}</p>
@@ -114,7 +114,7 @@ export default function LoginPage() {
                 maxLength={128}
                 {...register('password')}
                 aria-invalid={!!errors.password}
-                className="border-neutral-200 focus-visible:ring-0 focus-visible:border-neutral-900 transition-colors rounded-lg pr-10"
+                className="bg-white border-neutral-200 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:border-neutral-200 focus-visible:shadow-sm transition-colors rounded-lg pr-10"
               />
               <button
                 type="button"
@@ -139,7 +139,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-neutral-900 text-white hover:bg-neutral-700 transition-colors rounded-lg"
+            className="w-full bg-[#2563AF]/10 text-[#2563AF] hover:bg-[#2563AF]/15 transition-colors rounded-lg"
           >
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </Button>

@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
-import { formatCurrency } from '@/lib/format'
+import { useEffect, useState } from 'react'
+import { useMotionValue, useSpring } from 'framer-motion'
+import { useFormatCurrency } from '@/context/CurrencyContext'
 
 type Props = {
   value: number
@@ -8,13 +8,17 @@ type Props = {
 }
 
 export default function AnimatedCurrency({ value, className }: Props) {
+  const fmt = useFormatCurrency()
   const raw = useMotionValue(value)
   const spring = useSpring(raw, { stiffness: 80, damping: 22, mass: 0.6 })
-  const formatted = useTransform(spring, (v) => formatCurrency(v))
+  const [display, setDisplay] = useState(() => fmt(value))
+
+  useEffect(() => { raw.set(value) }, [raw, value])
 
   useEffect(() => {
-    raw.set(value)
-  }, [raw, value])
+    setDisplay(fmt(spring.get()))
+    return spring.on('change', (v: number) => setDisplay(fmt(v)))
+  }, [spring, fmt])
 
-  return <motion.span className={className}>{formatted}</motion.span>
+  return <span className={className}>{display}</span>
 }
