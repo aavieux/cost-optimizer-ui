@@ -1,4 +1,4 @@
-﻿import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Building2, Server, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'

@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, TrendingDown, ArrowUpDown } from 'lucide-react'
 import { useDashboard } from '@/hooks/useDashboard'
