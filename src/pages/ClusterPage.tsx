@@ -47,7 +47,7 @@ const TIME_WINDOWS: { label: string; value: TimeWindow; diagnostic?: boolean }[]
   { label: "30d", value: "30d" },
 ];
 
-function savingsLabel(_window: TimeWindow): string {
+function savingsLabel(): string {
   return "Monthly Savings"
 }
 
@@ -497,7 +497,7 @@ const STATUS_LABEL: Record<WorkloadRecommendation["status"], string> = {
   UNDER_PROVISIONED: "Under-prov.",
   OPTIMAL:           "Optimal",
   MIXED:             "Mixed",
-  UNBOUNDED:         "No requests",
+  UNBOUNDED:         "Unbounded",
   INSUFFICIENT_DATA: "Insuff. data",
 };
 
@@ -1065,7 +1065,7 @@ export default function ClusterPage() {
             <div className="p-6">
               <div className="flex items-center gap-1 mb-2">
                 <p className="text-xs text-neutral-400 uppercase tracking-wide">
-                  {savingsLabel(timeWindow)}
+                  {savingsLabel()}
                 </p>
                 <div className="relative group/tip">
                   <Info size={11} className="text-neutral-300 cursor-default" />
@@ -1123,7 +1123,7 @@ export default function ClusterPage() {
           {wb.unbounded > 0 && (
             <span className="flex items-center gap-1.5 text-xs text-neutral-500">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
-              {wb.unbounded} no requests
+              {wb.unbounded} unbounded
             </span>
           )}
           {wb.optimal > 0 && (
@@ -1370,7 +1370,6 @@ export default function ClusterPage() {
                         customerId={customerId}
                         clusterId={clusterId}
                         isNew={newIds.has(w.workload_id)}
-                        timeWindow={timeWindow}
                       />
                     ))}
                   </div>
@@ -1386,7 +1385,6 @@ export default function ClusterPage() {
                   customerId={customerId}
                   clusterId={clusterId}
                   isNew={newIds.has(w.workload_id)}
-                  timeWindow={timeWindow}
                 />
               ))}
             </div>
@@ -1481,7 +1479,6 @@ export default function ClusterPage() {
                           workload={w}
                           customerId={customerId}
                           clusterId={clusterId}
-                          timeWindow={timeWindow}
                         />
                       ))}
                     </div>
@@ -1519,7 +1516,6 @@ export default function ClusterPage() {
                   workload={w}
                   customerId={customerId}
                   clusterId={clusterId}
-                  timeWindow={timeWindow}
                 />
               ))}
               {sortItems(allLostPending, workloadSort, sortDir).map((w) => (

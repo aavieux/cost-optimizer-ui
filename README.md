@@ -1,73 +1,101 @@
-# React + TypeScript + Vite
+<div align="center">
+  <img src="./src/assets/logo.svg" alt="Cloud Zenith" width="120" />
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+  # Cloud Zenith — Cost Optimizer UI
 
-Currently, two official plugins are available:
+  Frontend for the Cloud Zenith Kubernetes cost optimization platform. Visualizes cluster rightsizing recommendations and savings opportunities across customers and workloads.
+</div>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Overview
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Cloud Zenith Cost Optimizer UI is a React dashboard that connects to the [cost-optimizer](../cost-optimizer) Go backend. It gives platform teams a single pane of glass to:
 
-## Expanding the ESLint configuration
+- Track infrastructure spend and projected savings across all customers
+- Drill into individual clusters and see per-workload CPU/RAM usage vs. configured requests/limits
+- Review rightsizing recommendations and understand workload health status (wasteful, under-provisioned, unbounded, etc.)
+- Manage customers (create, rename, delete) and switch between them
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Dashboard** — aggregate spend, recommended target, and total savings with 7-day / 30-day windows
+- **Customers** — searchable, sortable customer list with inline CRUD
+- **Customer detail** — cost breakdown and cluster grid with workload status indicators
+- **Cluster detail** — time-series CPU/RAM charts (actual vs. requested vs. recommended), workload recommendations table, savings summary
+- **Currency toggle** — switch between USD and EUR globally
+- **Auth** — JWT-based login with automatic 401 redirect
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Tech Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Layer | Library |
+|---|---|
+| UI framework | React 19 + TypeScript |
+| Build | Vite |
+| Routing | React Router 7 |
+| Server state | TanStack Query 5 |
+| HTTP | Axios |
+| Forms | React Hook Form + Zod |
+| Styling | Tailwind CSS 4 + shadcn/ui |
+| Charts | Recharts |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| Notifications | Sonner |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- The [cost-optimizer](../cost-optimizer) backend running on `http://localhost:8080`
+
+### Install & run
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app will be available at `http://localhost:5173`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Environment
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Create a `.env` file in the project root if you need to override the API base URL:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080/api/v1
 ```
+
+### Other scripts
+
+```bash
+npm run build    # Type-check + production build
+npm run preview  # Serve the production build locally
+npm run lint     # Run ESLint
+```
+
+## Project Structure
+
+```
+src/
+├── pages/          # Route-level components (Login, Dashboard, Customers, Cluster, ...)
+├── components/     # Shared UI components and shadcn wrappers
+├── hooks/          # TanStack Query hooks — one per API resource
+├── context/        # Global client state (currency)
+├── lib/
+│   ├── api.ts      # Axios instance with auth interceptor
+│   └── format.ts   # Currency, bytes, percentage formatters
+└── types/          # TypeScript interfaces mirroring the backend API
+```
+
+## Authentication
+
+Login with your Cloud Zenith credentials. The JWT is stored in `localStorage` and attached as a `Bearer` token to every request. Sessions expire after 30 minutes; the app redirects to the login page on any `401`.
+
+## Documentation
+
+Additional documentation lives in [`docs/`](./docs):
+
+- [`API.md`](./docs/API.md) — full backend API reference
+- [`architecture.md`](./docs/architecture.md) — architecture decision records
+- [`CLAUDE.md`](./docs/CLAUDE.md) — developer guide and conventions
