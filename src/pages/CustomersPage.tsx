@@ -292,7 +292,7 @@ export default function CustomersPage() {
               </button>
               <button
                 type="submit"
-                disabled={isMutating || (modal.type === 'rename' && watch('name').trim() === modal.customer.name)}
+                disabled={isMutating || (modal.type === 'rename' && watch('name').trim() === modal.customer.name.trim())}
                 className="px-4 py-1.5 text-xs font-medium bg-[#2563AF]/10 text-[#2563AF] rounded-lg hover:bg-[#2563AF]/15 disabled:opacity-40 transition-colors"
               >
                 {isMutating ? 'Saving…' : modal.type === 'create' ? 'Create' : 'Save'}

@@ -11,13 +11,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  server: {
-    proxy: {
-      '/frankfurter': {
-        target: 'https://api.frankfurter.app',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/frankfurter/, ''),
-      },
-    },
-  },
 })

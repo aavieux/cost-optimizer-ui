@@ -14,7 +14,7 @@ const NAV_ITEMS = [
 export default function Layout() {
   const navigate = useNavigate()
   const username = localStorage.getItem('username')
-  const { currency, setCurrency, isLoadingRate } = useCurrency()
+  const { currency, setCurrency } = useCurrency()
 
   async function handleLogout() {
     try {
@@ -68,13 +68,11 @@ export default function Layout() {
               <button
                 key={c}
                 onClick={() => setCurrency(c)}
-                disabled={isLoadingRate && c === 'EUR' && currency !== 'EUR'}
                 className={cn(
                   'flex-1 py-1 rounded-md text-xs font-medium transition-colors',
                   currency === c
                     ? 'bg-[#2563AF]/10 text-[#2563AF]'
                     : 'text-neutral-400 hover:text-neutral-700',
-                  isLoadingRate && c === 'EUR' && currency !== 'EUR' && 'opacity-40 cursor-not-allowed',
                 )}
               >
                 {c}

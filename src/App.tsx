@@ -21,7 +21,7 @@ function isAuthenticated() {
 
 function ProtectedLayout() {
   if (!isAuthenticated()) {
-    localStorage.clear()
+    localStorage.clear() //TODO Consider deleting the items one by one
     return <Navigate to="/login" replace />
   }
   return <CurrencyProvider><Layout /></CurrencyProvider>
