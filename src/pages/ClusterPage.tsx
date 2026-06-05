@@ -7,6 +7,7 @@ import {
   ArrowUp,
   ArrowDown,
   Info,
+  Cog,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -82,16 +83,6 @@ function localDateStr(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function currentUserFromToken(): string {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) return "";
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return String(payload.sub ?? payload.email ?? "");
-  } catch {
-    return "";
-  }
-}
 
 function todayStr(): string {
   return localDateStr(new Date());
@@ -246,6 +237,18 @@ function DatePicker({
 }
 
 type ChartPoint = MetricPoint & { ts_ms: number };
+type MergedChartPoint = ChartPoint & {
+  app_val?: number | null;
+  sys_val?: number | null;
+};
+
+function sumOrNull(
+  a: number | null | undefined,
+  b: number | null | undefined,
+): number | null {
+  if (a == null && b == null) return null;
+  return (a ?? 0) + (b ?? 0);
+}
 
 function fmtTime(v: number): string {
   return new Date(v).toLocaleTimeString("en-US", {
@@ -265,7 +268,8 @@ function fmtDate(v: number): string {
 // ─── MetricChart ──────────────────────────────────────────────────────────────
 
 type MetricChartProps = {
-  data: ChartPoint[];
+  appData: ChartPoint[];
+  systemData?: ChartPoint[];
   dataKey: "cpu_cores" | "ram_bytes";
   label: string;
   valueFormatter: (v: number) => string;
@@ -278,7 +282,8 @@ type MetricChartProps = {
 };
 
 function MetricChart({
-  data,
+  appData,
+  systemData,
   dataKey,
   label,
   valueFormatter,
@@ -291,6 +296,33 @@ function MetricChart({
 }: MetricChartProps) {
   const lineColor = accent ? "#10b981" : "#a3a3a3";
   const dotColor = accent ? "#059669" : "#737373";
+  const maxKey = (dataKey === "cpu_cores" ? "max_cpu_cores" : "max_ram_bytes") as
+    "max_cpu_cores" | "max_ram_bytes";
+
+  const hasSystem = (systemData?.length ?? 0) > 0;
+
+  const mergedData = useMemo((): MergedChartPoint[] => {
+    if (!hasSystem) return appData;
+    return appData.map((pt, i) => {
+      const sys = systemData![i];
+      return {
+        ...pt,
+        cpu_cores:     sumOrNull(pt.cpu_cores,     sys?.cpu_cores),
+        ram_bytes:     sumOrNull(pt.ram_bytes,      sys?.ram_bytes),
+        max_cpu_cores: sumOrNull(pt.max_cpu_cores,  sys?.max_cpu_cores),
+        max_ram_bytes: sumOrNull(pt.max_ram_bytes,  sys?.max_ram_bytes),
+        app_val: pt[dataKey],
+        sys_val: sys?.[dataKey] ?? null,
+      };
+    });
+  }, [appData, systemData, hasSystem, dataKey]);
+
+  function isSpike(pt: MergedChartPoint): boolean {
+    const avg = pt[dataKey];
+    const max = pt[maxKey];
+    return avg != null && max != null && max > avg * 2;
+  }
+
   return (
     <div>
       <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">
@@ -298,7 +330,7 @@ function MetricChart({
       </p>
       <ResponsiveContainer width="100%" height={140}>
         <ComposedChart
-          data={data}
+          data={mergedData}
           margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
         >
           <defs>
@@ -333,8 +365,10 @@ function MetricChart({
               if (!active || !payload?.length) return null;
               const entry = payload.find((p) => p.value != null);
               if (!entry) return null;
-              const val = entry.value as number;
-              const ts = (entry.payload as ChartPoint).ts_ms;
+              const pt = entry.payload as MergedChartPoint;
+              const val = pt[dataKey];
+              const maxVal = pt[maxKey];
+              const spike = isSpike(pt);
               return (
                 <div
                   style={{
@@ -346,10 +380,29 @@ function MetricChart({
                     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                   }}
                 >
-                  <p style={{ color: "#a3a3a3", marginBottom: 2 }}>
-                    {new Date(ts).toLocaleString()}
+                  <p style={{ color: "#a3a3a3", marginBottom: 4 }}>
+                    {new Date(pt.ts_ms).toLocaleString()}
                   </p>
-                  <p style={{ color: "#171717" }}>{valueFormatter(val)}</p>
+                  {val != null && (
+                    <p style={{ color: "#171717" }}>
+                      {hasSystem ? "total: " : ""}{valueFormatter(val)}
+                    </p>
+                  )}
+                  {hasSystem && pt.app_val != null && (
+                    <p style={{ color: "#a3a3a3", marginTop: 2, fontSize: 11 }}>
+                      app: {valueFormatter(pt.app_val)}
+                    </p>
+                  )}
+                  {hasSystem && pt.sys_val != null && (
+                    <p style={{ color: "#a3a3a3", fontSize: 11 }}>
+                      sys: {valueFormatter(pt.sys_val)}
+                    </p>
+                  )}
+                  {maxVal != null && (
+                    <p style={{ color: spike ? "#ef4444" : "#a3a3a3", marginTop: 2, fontSize: 11 }}>
+                      peak: {valueFormatter(maxVal)}
+                    </p>
+                  )}
                 </div>
               );
             }}
@@ -377,7 +430,21 @@ function MetricChart({
             dataKey={dataKey}
             stroke={lineColor}
             strokeWidth={1.5}
-            dot={false}
+            dot={(props: { cx?: number; cy?: number; index: number; payload: MergedChartPoint }) => {
+              if (!isSpike(props.payload) || props.cx == null || props.cy == null)
+                return <g key={`dot-${props.index}`} />;
+              return (
+                <circle
+                  key={`dot-${props.index}`}
+                  cx={props.cx}
+                  cy={props.cy}
+                  r={3}
+                  fill="#ef4444"
+                  stroke="white"
+                  strokeWidth={1.5}
+                />
+              );
+            }}
             activeDot={{ r: 3, fill: dotColor, strokeWidth: 0 }}
             connectNulls={false}
             isAnimationActive={false}
@@ -390,7 +457,7 @@ function MetricChart({
 
 // ─── Workload sort / group helpers ────────────────────────────────────────────
 
-type WorkloadSort = "name" | "savings" | "status" | "samples" | "kind" | "namespace";
+type WorkloadSort = "name" | "savings" | "status" | "samples" | "kind" | "namespace" | "system";
 type SortDir = "asc" | "desc";
 
 const WORKLOAD_SORT_OPTIONS: { label: string; value: WorkloadSort }[] = [
@@ -400,9 +467,10 @@ const WORKLOAD_SORT_OPTIONS: { label: string; value: WorkloadSort }[] = [
   { label: "Samples", value: "samples" },
   { label: "Workload type", value: "kind" },
   { label: "Group", value: "namespace" },
+  { label: "System / App", value: "system" },
 ];
 
-const GROUPED_SORTS: WorkloadSort[] = ["kind", "namespace"];
+const GROUPED_SORTS: WorkloadSort[] = ["kind", "namespace", "system"];
 
 const STATUS_ORDER: Record<string, number> = {
   WASTEFUL: 0,
@@ -417,6 +485,7 @@ type Sortable = {
   name: string;
   namespace: string;
   kind: string;
+  is_system: boolean;
   sample_count: number;
   status?: string;
   monthly_savings?: number;
@@ -451,6 +520,11 @@ function sortItems<T extends Sortable>(
       }
       case "savings":
         return m * ((a.monthly_savings ?? 0) - (b.monthly_savings ?? 0));
+      case "system": {
+        const sa = a.is_system ? 1 : 0;
+        const sb = b.is_system ? 1 : 0;
+        return m * ((sa - sb) || a.name.localeCompare(b.name));
+      }
     }
   });
 }
@@ -473,7 +547,9 @@ function groupBy<T>(
 }
 
 function sectionKey(sort: WorkloadSort): (item: Sortable) => string {
-  return sort === "kind" ? (i) => i.kind : (i) => i.namespace;
+  if (sort === "kind") return (i) => i.kind;
+  if (sort === "system") return (i) => (i.is_system ? "System" : "App");
+  return (i) => i.namespace;
 }
 
 function isWorkloadStale(lastSeenAt: string | null): boolean {
@@ -490,6 +566,7 @@ const STATUS_STYLE: Record<WorkloadRecommendation["status"], string> = {
   MIXED:             "text-orange-500 bg-orange-50",
   UNBOUNDED:         "text-violet-600 bg-violet-50",
   INSUFFICIENT_DATA: "text-neutral-400 bg-neutral-100",
+  SPEC_CHANGED:      "text-neutral-400 bg-neutral-100",
 };
 
 const STATUS_LABEL: Record<WorkloadRecommendation["status"], string> = {
@@ -499,6 +576,7 @@ const STATUS_LABEL: Record<WorkloadRecommendation["status"], string> = {
   MIXED:             "Mixed",
   UNBOUNDED:         "Unbounded",
   INSUFFICIENT_DATA: "Insuff. data",
+  SPEC_CHANGED:      "Spec changed",
 };
 
 function WorkloadRow({
@@ -537,6 +615,11 @@ function WorkloadRow({
           <span className="text-xs text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
             {workload.kind}
           </span>
+          {workload.is_system && (
+            <span title="System workload" className="shrink-0 text-neutral-400 hover:text-neutral-700 transition-colors cursor-default">
+              <Cog size={12} />
+            </span>
+          )}
           {workload.stability === "VARIABLE" && (
             <span className="text-xs text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded shrink-0">
               variable
@@ -626,6 +709,11 @@ function PendingRow({
           <span className="text-xs text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
             {workload.kind}
           </span>
+          {workload.is_system && (
+            <span title="System workload" className="shrink-0 text-neutral-400 hover:text-neutral-700 transition-colors cursor-default">
+              <Cog size={12} />
+            </span>
+          )}
         </div>
         <p className="text-xs text-neutral-400 mt-0.5">{workload.namespace}</p>
       </div>
@@ -665,7 +753,6 @@ function PendingRow({
 
 export default function ClusterPage() {
   const { id, cid } = useParams<{ id: string; cid: string }>();
-  const currentUser = currentUserFromToken();
   const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
     const s = localStorage.getItem("time_window");
     return (["1d", "7d", "30d"] as TimeWindow[]).includes(s as TimeWindow)
@@ -684,6 +771,15 @@ export default function ClusterPage() {
     const s = localStorage.getItem("workload_sort_dir");
     return s === "asc" || s === "desc" ? s : "asc";
   });
+  const [hideSystem, setHideSystem] = useState(
+    () => localStorage.getItem("hide_system") === "true",
+  );
+  const [hideSystemChart, setHideSystemChart] = useState(
+    () => localStorage.getItem("hide_system_chart") === "true",
+  );
+  const [excludeSystemFromSavings, setExcludeSystemFromSavings] = useState(
+    () => localStorage.getItem("exclude_system_savings") === "true",
+  );
   const [hourDay, setHourDay] = useState(() => todayStr());
   const [rangeFrom, setRangeFrom] = useState(() => daysAgoStr(7));
   const [rangeTo, setRangeTo] = useState(() => todayStr());
@@ -785,61 +881,24 @@ export default function ClusterPage() {
     prevSampleCountsRef.current = current;
   }, [recommendations.data]);
 
-  type CachedEntry = {
-    kind: "workload" | "pending";
-    data: WorkloadRecommendation | PendingWorkload;
-    cachedAt: number;
-  };
-  const [cachedOffline, setCachedOffline] = useState<CachedEntry[]>([]);
 
-  useEffect(() => {
-    if (!recommendations.data) return;
-    const prefix = `workload:${currentUser}:${clusterId}:`;
-    const now = Date.now();
-    const curIds = new Set([
-      ...recommendations.data.workloads.map((w) => w.workload_id),
-      ...recommendations.data.pending_workloads.map((w) => w.workload_id),
-    ]);
-    for (const w of recommendations.data.workloads) {
-      localStorage.setItem(
-        `${prefix}${w.workload_id}`,
-        JSON.stringify({ kind: "workload", data: w, cachedAt: now }),
-      );
+  function toChartPoints(points: MetricPoint[], granularity: GranularityView, hourDay: string): ChartPoint[] {
+    if (granularity === "hour") {
+      const dayEnd = new Date(hourDay + "T00:00:00").getTime() + 86_400_000;
+      return points
+        .filter((p) => new Date(p.ts).getTime() <= dayEnd)
+        .map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
     }
-    for (const w of recommendations.data.pending_workloads) {
-      localStorage.setItem(
-        `${prefix}${w.workload_id}`,
-        JSON.stringify({ kind: "pending", data: w, cachedAt: now }),
-      );
-    }
-    const offline: CachedEntry[] = [];
-    for (const key of Object.keys(localStorage)) {
-      if (!key.startsWith(prefix)) continue;
-      try {
-        const e = JSON.parse(localStorage.getItem(key)!) as CachedEntry;
-        if (now - e.cachedAt > 7 * 24 * 60 * 60 * 1000) {
-          localStorage.removeItem(key);
-          continue;
-        }
-        if (!curIds.has(e.data.workload_id)) offline.push(e);
-      } catch {
-        localStorage.removeItem(key);
-      }
-    }
-    startTransition(() => setCachedOffline(offline));
-  }, [recommendations.data, clusterId, currentUser]);
+    return points.map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
+  }
 
   const chartData = useMemo<ChartPoint[]>(
-    () => {
-      const points = metrics.data?.points ?? [];
-      if (granularity === "hour") {
-        const dayEnd = new Date(hourDay + "T00:00:00").getTime() + 86_400_000;
-        return points
-          .filter((p) => new Date(p.ts).getTime() <= dayEnd)
-          .map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
-      }
-      return points.map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
-    },
+    () => toChartPoints(metrics.data?.app_points ?? [], granularity, hourDay),
+    [metrics.data, granularity, hourDay],
+  );
+
+  const systemChartData = useMemo<ChartPoint[]>(
+    () => toChartPoints(metrics.data?.system_points ?? [], granularity, hourDay),
     [metrics.data, granularity, hourDay],
   );
 
@@ -874,37 +933,32 @@ export default function ClusterPage() {
       : fmtDate;
   const tickCount = granularity === "hour" ? 7 : 6;
 
+  const displayedTotalSavings = useMemo(() => {
+    if (!recommendations.data) return 0;
+    if (hideSystem && excludeSystemFromSavings) {
+      return recommendations.data.workloads
+        .filter((w) => !w.is_system)
+        .reduce((sum, w) => sum + w.monthly_savings, 0);
+    }
+    return recommendations.data.total_monthly_savings;
+  }, [recommendations.data, hideSystem, excludeSystemFromSavings]);
+
   const activeWorkloads =
     recommendations.data?.workloads.filter(
-      (w) => !isWorkloadStale(w.last_seen_at),
+      (w) => !isWorkloadStale(w.last_seen_at) && (!hideSystem || !w.is_system),
     ) ?? [];
   const lostWorkloads =
-    recommendations.data?.workloads.filter((w) =>
-      isWorkloadStale(w.last_seen_at),
+    recommendations.data?.workloads.filter(
+      (w) => isWorkloadStale(w.last_seen_at) && (!hideSystem || !w.is_system),
     ) ?? [];
   const activePending =
     recommendations.data?.pending_workloads.filter(
-      (w) => !isWorkloadStale(w.last_seen_at),
+      (w) => !isWorkloadStale(w.last_seen_at) && (!hideSystem || !w.is_system),
     ) ?? [];
   const lostPending =
-    recommendations.data?.pending_workloads.filter((w) =>
-      isWorkloadStale(w.last_seen_at),
+    recommendations.data?.pending_workloads.filter(
+      (w) => isWorkloadStale(w.last_seen_at) && (!hideSystem || !w.is_system),
     ) ?? [];
-
-  const lostFromCache = cachedOffline.filter(
-    (e) =>
-      e.data.last_seen_at != null &&
-      now - new Date(e.data.last_seen_at).getTime() <= 15 * 60_000,
-  );
-
-  const allLostWorkloads = [
-    ...lostWorkloads,
-    ...lostFromCache.filter((e) => e.kind === 'workload').map((e) => e.data as WorkloadRecommendation),
-  ]
-  const allLostPending = [
-    ...lostPending,
-    ...lostFromCache.filter((e) => e.kind === 'pending').map((e) => e.data as PendingWorkload),
-  ]
 
   if (
     !id ||
@@ -1041,9 +1095,17 @@ export default function ClusterPage() {
           )}
           <div className="grid grid-cols-3 divide-x divide-neutral-100">
             <div className="p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-                Monthly Spend
-              </p>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide">
+                  Current Monthly Price
+                </p>
+                <div className="relative group/tip">
+                  <Info size={11} className="text-neutral-300 cursor-default" />
+                  <div className="absolute bottom-full left-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
+                    Estimated monthly cost based on the current resource requests of all active workloads and their pod counts.
+                  </div>
+                </div>
+              </div>
               <p className="text-2xl font-semibold text-neutral-900">
                 <AnimatedCurrency value={summary.data.monthly_cost_current} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">
@@ -1147,7 +1209,26 @@ export default function ClusterPage() {
           <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
             Resource Usage
           </p>
-          <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() =>
+                setHideSystemChart((h) => {
+                  const next = !h;
+                  localStorage.setItem("hide_system_chart", String(next));
+                  return next;
+                })
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors",
+                hideSystemChart
+                  ? "text-neutral-900 bg-neutral-100 border-neutral-300"
+                  : "text-neutral-400 border-neutral-200 hover:text-neutral-700",
+              )}
+            >
+              <Cog size={11} />
+              {hideSystemChart ? "Show system" : "Hide system"}
+            </button>
+            <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
             {GRANULARITY_OPTIONS.map(({ label, value }) => (
               <button
                 key={value}
@@ -1162,6 +1243,7 @@ export default function ClusterPage() {
                 {label}
               </button>
             ))}
+            </div>
           </div>
         </div>
 
@@ -1245,7 +1327,8 @@ export default function ClusterPage() {
         {metrics.data && (
           <div className={cn("relative z-0 space-y-8 transition-opacity duration-300", metrics.isFetching ? "opacity-40" : "opacity-100")}>
             <MetricChart
-              data={chartData}
+              appData={chartData}
+              systemData={hideSystemChart ? undefined : systemChartData}
               dataKey="cpu_cores"
               label="CPU (cores)"
               valueFormatter={(v) => v.toFixed(2)}
@@ -1257,7 +1340,8 @@ export default function ClusterPage() {
               futureFrom={futureFromMs}
             />
             <MetricChart
-              data={chartData}
+              appData={chartData}
+              systemData={hideSystemChart ? undefined : systemChartData}
               dataKey="ram_bytes"
               label="RAM"
               valueFormatter={(v) => formatBytes(v)}
@@ -1286,12 +1370,44 @@ export default function ClusterPage() {
             {recommendations.data && ` · ${activeWorkloads.length}`}
           </h2>
           <div className="flex items-center gap-3">
-            {recommendations.data &&
-              recommendations.data.total_monthly_savings > 0 && (
-                <span className="text-xs text-emerald-600 font-medium">
-                  {fmt(recommendations.data.total_monthly_savings)}/mo total savings
-                </span>
+            {recommendations.data && displayedTotalSavings > 0 && (
+              <span className="text-xs text-emerald-600 font-medium">
+                {fmt(displayedTotalSavings)}/mo total savings
+              </span>
+            )}
+            <button
+              onClick={() =>
+                setHideSystem((h) => {
+                  const next = !h;
+                  localStorage.setItem("hide_system", String(next));
+                  return next;
+                })
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors",
+                hideSystem
+                  ? "text-neutral-900 bg-neutral-100 border-neutral-300"
+                  : "text-neutral-400 border-neutral-200 hover:text-neutral-700",
               )}
+            >
+              <Cog size={11} />
+              {hideSystem ? "Showing app only" : "Hide system"}
+            </button>
+            {hideSystem && (
+              <label className="inline-flex items-center gap-1.5 text-xs text-neutral-500 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={excludeSystemFromSavings}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setExcludeSystemFromSavings(next);
+                    localStorage.setItem("exclude_system_savings", String(next));
+                  }}
+                  className="w-3 h-3 accent-neutral-800 cursor-pointer"
+                />
+                Excl. system from totals
+              </label>
+            )}
             <div className="flex items-center gap-2">
               <button
                 onClick={() =>
@@ -1392,8 +1508,7 @@ export default function ClusterPage() {
 
         {recommendations.data &&
           activeWorkloads.length === 0 &&
-          lostWorkloads.length === 0 &&
-          lostFromCache.length === 0 && (
+          lostWorkloads.length === 0 && (
             <p className="text-sm text-neutral-400">
               No recommendations for this window.
             </p>
@@ -1449,12 +1564,12 @@ export default function ClusterPage() {
       )}
 
       {/* Lost Connection — reporting stopped >1 min ago, backend still tracking */}
-      {(allLostWorkloads.length > 0 || allLostPending.length > 0) && (
+      {(lostWorkloads.length > 0 || lostPending.length > 0) && (
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
               Lost Connection ·{" "}
-              {allLostWorkloads.length + allLostPending.length}
+              {lostWorkloads.length + lostPending.length}
             </h2>
             <span className="text-xs text-neutral-400">
               no data in 1 min · removed from recommendations after 15 min
@@ -1462,9 +1577,9 @@ export default function ClusterPage() {
           </div>
           {GROUPED_SORTS.includes(workloadSort) ? (
             <div className="space-y-5">
-              {allLostWorkloads.length > 0 &&
+              {lostWorkloads.length > 0 &&
                 groupBy(
-                  sortItems(allLostWorkloads, workloadSort, sortDir),
+                  sortItems(lostWorkloads, workloadSort, sortDir),
                   sectionKey(workloadSort),
                   sortDir,
                 ).map(([section, items]) => (
@@ -1484,9 +1599,9 @@ export default function ClusterPage() {
                     </div>
                   </div>
                 ))}
-              {allLostPending.length > 0 &&
+              {lostPending.length > 0 &&
                 groupBy(
-                  sortItems(allLostPending, workloadSort, sortDir),
+                  sortItems(lostPending, workloadSort, sortDir),
                   sectionKey(workloadSort),
                   sortDir,
                 ).map(([section, items]) => (
@@ -1510,7 +1625,7 @@ export default function ClusterPage() {
             </div>
           ) : (
             <div className="bg-white border border-rose-100 rounded-xl divide-y divide-neutral-100 opacity-60">
-              {sortItems(allLostWorkloads, workloadSort, sortDir).map((w) => (
+              {sortItems(lostWorkloads, workloadSort, sortDir).map((w) => (
                 <WorkloadRow
                   key={w.workload_id}
                   workload={w}
@@ -1518,7 +1633,7 @@ export default function ClusterPage() {
                   clusterId={clusterId}
                 />
               ))}
-              {sortItems(allLostPending, workloadSort, sortDir).map((w) => (
+              {sortItems(lostPending, workloadSort, sortDir).map((w) => (
                 <PendingRow
                   key={w.workload_id}
                   workload={w}

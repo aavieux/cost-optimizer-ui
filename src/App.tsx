@@ -9,6 +9,7 @@ import CustomersPage from '@/pages/CustomersPage'
 import ClustersPage from '@/pages/ClustersPage'
 import CustomerPage from '@/pages/CustomerPage'
 import ClusterPage from '@/pages/ClusterPage'
+import WorkloadPage from '@/pages/WorkloadPage'
 
 const queryClient = new QueryClient()
 
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:id" element={<CustomerPage />} />
             <Route path="/customers/:id/clusters/:cid" element={<ClusterPage />} />
+            <Route path="/customers/:id/clusters/:cid/workloads/:wid" element={<WorkloadPage />} />
             <Route path="/clusters" element={<ClustersPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
