@@ -49,7 +49,7 @@ const TIME_WINDOWS: { label: string; value: TimeWindow; diagnostic?: boolean }[]
 ];
 
 function savingsLabel(): string {
-  return "Monthly Savings"
+  return "Potential Monthly Savings"
 }
 
 const PROVIDER_STYLE: Record<string, string> = {

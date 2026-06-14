@@ -100,6 +100,7 @@ export type WorkloadDetailRecommendation = {
 
 export type SpecHistoryEntry = {
   recorded_at: string
+  source: "initial" | "detected" | "applied"
   cpu_request_cores: number
   cpu_limit_cores: number | null
   ram_request_bytes: number

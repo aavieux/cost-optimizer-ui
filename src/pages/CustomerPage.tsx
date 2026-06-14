@@ -12,7 +12,7 @@ import type { ClusterSummary } from '@/types/customer'
 
 function savingsLabel(window: TimeWindow): string {
   if (window === '7d') return 'Weekly Savings'
-  return 'Monthly Savings'
+  return 'Potential Monthly Savings'
 }
 
 const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [

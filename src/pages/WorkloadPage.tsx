@@ -684,43 +684,55 @@ export default function WorkloadPage() {
 
       {/* Spec history */}
       {workload?.spec_history && workload.spec_history.length > 0 && (
-        <div className="bg-white border border-neutral-100 rounded-xl">
+        <div className="bg-white border border-neutral-100 rounded-xl overflow-hidden">
           <div className="px-6 py-3 border-b border-neutral-100">
             <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
               Spec History
             </p>
           </div>
-          <div className="divide-y divide-neutral-100">
-            {workload.spec_history.map((entry, i) => (
-              <div key={i} className="flex items-center gap-8 px-6 py-4">
-                <span className="text-xs text-neutral-400 w-44 shrink-0">
-                  {new Date(entry.recorded_at).toLocaleString()}
-                </span>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="text-neutral-400">CPU</span>
-                  <span className="font-mono text-neutral-700">
-                    req {fmtCores(entry.cpu_request_cores)}
-                  </span>
-                  {entry.cpu_limit_cores != null && (
-                    <span className="font-mono text-neutral-400">
-                      lim {fmtCores(entry.cpu_limit_cores)}
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-neutral-100">
+                <th className="text-left text-neutral-400 font-medium px-6 py-2.5">Time</th>
+                <th className="text-left text-neutral-400 font-medium px-3 py-2.5">Source</th>
+                <th className="text-right text-neutral-400 font-medium px-3 py-2.5">CPU req</th>
+                <th className="text-right text-neutral-400 font-medium px-3 py-2.5">CPU lim</th>
+                <th className="text-right text-neutral-400 font-medium px-3 py-2.5">RAM req</th>
+                <th className="text-right text-neutral-400 font-medium px-6 py-2.5">RAM lim</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {workload.spec_history.map((entry, i) => (
+                <tr key={i} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-6 py-3 text-neutral-400 whitespace-nowrap">
+                    {new Date(entry.recorded_at).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded",
+                      entry.source === "applied"  && "text-emerald-600 bg-emerald-50",
+                      entry.source === "detected" && "text-blue-500 bg-blue-50",
+                      entry.source === "initial"  && "text-orange-500 bg-orange-50",
+                    )}>
+                      {entry.source}
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="text-neutral-400">RAM</span>
-                  <span className="font-mono text-neutral-700">
-                    req {formatBytes(entry.ram_request_bytes)}
-                  </span>
-                  {entry.ram_limit_bytes != null && (
-                    <span className="font-mono text-neutral-400">
-                      lim {formatBytes(entry.ram_limit_bytes)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-neutral-700">
+                    {fmtCores(entry.cpu_request_cores)}
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-neutral-400">
+                    {entry.cpu_limit_cores != null ? fmtCores(entry.cpu_limit_cores) : "—"}
+                  </td>
+                  <td className="px-3 py-3 text-right font-mono text-neutral-700">
+                    {formatBytes(entry.ram_request_bytes)}
+                  </td>
+                  <td className="px-6 py-3 text-right font-mono text-neutral-400">
+                    {entry.ram_limit_bytes != null ? formatBytes(entry.ram_limit_bytes) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

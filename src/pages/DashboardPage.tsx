@@ -26,7 +26,7 @@ type SortKey = typeof SORT_OPTIONS[number]['value']
 
 function savingsLabel(window: TimeWindow): string {
   if (window === '7d') return 'Weekly Savings'
-  return 'Monthly Savings'
+  return 'Potential Monthly Savings'
 }
 
 function sortCustomers(customers: DashboardCustomer[], key: SortKey): DashboardCustomer[] {
