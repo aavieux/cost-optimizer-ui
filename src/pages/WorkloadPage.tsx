@@ -13,6 +13,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import { useWorkloadDetail } from "@/hooks/useWorkloadDetail";
+import { useApplyRecommendation } from "@/hooks/useApplyRecommendation";
 import { formatBytes, fmtCpu, fmtRam, formatSavingsPercent } from "@/lib/format";
 import { useFormatCurrency } from "@/context/CurrencyContext";
 import { getErrorCode } from "@/lib/api";
@@ -255,6 +256,8 @@ export default function WorkloadPage() {
   const [granularity, setGranularity] = useState<GranularityView>("hour");
   const [hourDay, setHourDay] = useState(() => todayStr());
   const [now, setNow] = useState(() => Date.now());
+  const [confirming, setConfirming] = useState(false);
+  const apply = useApplyRecommendation();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -677,6 +680,61 @@ export default function WorkloadPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Apply */}
+                {!confirming ? (
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => setConfirming(true)}
+                      className="px-4 py-1.5 rounded-lg bg-[#2563AF] text-white text-xs font-medium hover:bg-[#1d4ed8] transition-colors"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-6 border border-neutral-100 rounded-lg p-4 bg-neutral-50">
+                    <div className="flex items-start gap-6 mb-4 text-xs">
+                      <div>
+                        <p className="text-neutral-400 mb-1">CPU</p>
+                        <p className="font-mono text-neutral-700">
+                          {fmtCpu(rec.cpu_request_current) || "—"}
+                          <span className="mx-1.5 text-neutral-300">→</span>
+                          <span className="text-emerald-600">{fmtCpu(rec.cpu_recommended)}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-neutral-400 mb-1">RAM</p>
+                        <p className="font-mono text-neutral-700">
+                          {fmtRam(rec.ram_request_current) || "—"}
+                          <span className="mx-1.5 text-neutral-300">→</span>
+                          <span className="text-emerald-600">{fmtRam(rec.ram_recommended)}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-amber-600 mb-4">
+                      Sample collection will restart for the selected window after applying. The recommendation will be unavailable until enough new samples are collected.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setConfirming(false)}
+                        disabled={apply.isPending}
+                        className="px-3 py-1.5 rounded-lg text-xs text-neutral-500 hover:text-neutral-700 transition-colors disabled:opacity-40"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => apply.mutate(
+                          { customerId, clusterId, workloadId, window: timeWindow },
+                          { onSuccess: () => setConfirming(false) },
+                        )}
+                        disabled={apply.isPending}
+                        className="px-4 py-1.5 rounded-lg bg-[#2563AF] text-white text-xs font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-60"
+                      >
+                        {apply.isPending ? "Applying…" : "Confirm"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
         </div>

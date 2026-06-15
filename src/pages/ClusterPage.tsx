@@ -23,6 +23,7 @@ import {
 import { useClusterSummary } from "@/hooks/useClusterSummary";
 import { useClusterMetrics } from "@/hooks/useClusterMetrics";
 import { useClusterRecommendations } from "@/hooks/useClusterRecommendations";
+import { useApplyRecommendation } from "@/hooks/useApplyRecommendation";
 import {
   formatBytes,
   formatSavingsPercent,
@@ -33,6 +34,7 @@ import { useFormatCurrency } from "@/context/CurrencyContext";
 import { getErrorCode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import AnimatedCurrency from "@/components/AnimatedCurrency";
+import Dialog from "@/components/Dialog";
 import type { TimeWindow } from "@/types/dashboard";
 import type {
   MetricPoint,
@@ -579,106 +581,138 @@ const STATUS_LABEL: Record<WorkloadRecommendation["status"], string> = {
   SPEC_CHANGED:      "Spec changed",
 };
 
+const ACTIONABLE_STATUSES = new Set<WorkloadRecommendation["status"]>([
+  "WASTEFUL", "UNDER_PROVISIONED", "MIXED", "OPTIMAL", "UNBOUNDED",
+]);
+
 function WorkloadRow({
   workload,
   customerId,
   clusterId,
   isNew,
+  selected,
+  onToggle,
 }: {
   workload: WorkloadRecommendation;
   customerId: number;
   clusterId: number;
   isNew?: boolean;
+  selected?: boolean;
+  onToggle?: (id: number) => void;
 }) {
   const fmt = useFormatCurrency()
   const stale = isWorkloadStale(workload.last_seen_at);
+  const actionable = ACTIONABLE_STATUSES.has(workload.status);
   return (
-    <Link
-      to={`/customers/${customerId}/clusters/${clusterId}/workloads/${workload.workload_id}`}
+    <div
       className={cn(
-        "flex items-center gap-4 px-6 py-4 hover:bg-neutral-50 transition-colors group",
+        "flex items-center gap-3 hover:bg-neutral-50 transition-colors group",
         isNew && "animate-workload-enter",
       )}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-neutral-900 truncate">
-            {workload.name}
-          </span>
-          <span
-            className={cn(
-              "inline-block w-2 h-2 rounded-sm bg-rose-500 shrink-0 transition-opacity duration-700",
-              stale ? "opacity-100" : "opacity-0 pointer-events-none",
-            )}
-            title="No data received in the last minute — excluded from recommendations after 15 min"
-          />
-          <span className="text-xs text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
-            {workload.kind}
-          </span>
-          {workload.is_system && (
-            <span title="System workload" className="shrink-0 text-neutral-400 hover:text-neutral-700 transition-colors cursor-default">
-              <Cog size={12} />
-            </span>
-          )}
-          {workload.stability === "VARIABLE" && (
-            <span className="text-xs text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded shrink-0">
-              variable
-            </span>
+      {onToggle && (
+        <div className="pl-4 shrink-0 flex items-center">
+          {actionable ? (
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={() => onToggle(workload.workload_id)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-3.5 h-3.5 accent-[#2563AF] cursor-pointer"
+            />
+          ) : (
+            <div className="w-3.5 h-3.5" />
           )}
         </div>
-        <p className="text-xs text-neutral-400 mt-0.5">{workload.namespace}</p>
-      </div>
-      <div className="text-right shrink-0 w-36">
-        <p className="text-xs text-neutral-400 mb-0.5">CPU</p>
-        <p className="text-xs flex items-center justify-end gap-1">
-          {workload.cpu_status === "UNBOUNDED"
-            ? <span className="text-neutral-400">—</span>
-            : <span className="text-rose-400 line-through">{fmtCpu(workload.cpu_request_current)}</span>}
-          <span className="text-neutral-300">→</span>
-          <span className="text-emerald-600">{fmtCpu(workload.cpu_recommended)}</span>
-        </p>
-      </div>
-      <div className="text-right shrink-0 w-36">
-        <p className="text-xs text-neutral-400 mb-0.5">RAM</p>
-        <p className="text-xs flex items-center justify-end gap-1">
-          {workload.ram_status === "UNBOUNDED"
-            ? <span className="text-neutral-400">—</span>
-            : <span className="text-rose-400 line-through">{fmtRam(workload.ram_request_current)}</span>}
-          <span className="text-neutral-300">→</span>
-          <span className="text-emerald-600">{fmtRam(workload.ram_recommended)}</span>
-        </p>
-      </div>
-      <div className="text-right shrink-0 w-24">
-        <p className="text-xs text-neutral-400 mb-0.5">Savings</p>
-        <p className="text-xs font-semibold text-emerald-600">
-          {workload.status === "UNBOUNDED" ? "—" : `${fmt(workload.monthly_savings)}/mo`}
-        </p>
-      </div>
-      <div className="shrink-0 w-24 text-right">
-        <span
-          className={cn(
-            "text-xs px-2 py-0.5 rounded-full font-medium",
-            STATUS_STYLE[workload.status],
-          )}
-        >
-          {STATUS_LABEL[workload.status]}
-        </span>
-      </div>
-      <ArrowRight
-        size={14}
-        className="text-neutral-300 group-hover:text-neutral-600 transition-colors shrink-0"
-      />
-    </Link>
+      )}
+      <Link
+        to={`/customers/${customerId}/clusters/${clusterId}/workloads/${workload.workload_id}`}
+        className="flex-1 flex items-center gap-4 px-4 py-4 min-w-0"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-neutral-900 truncate">
+              {workload.name}
+            </span>
+            <span
+              className={cn(
+                "inline-block w-2 h-2 rounded-sm bg-rose-500 shrink-0 transition-opacity duration-700",
+                stale ? "opacity-100" : "opacity-0 pointer-events-none",
+              )}
+              title="No data received in the last minute — excluded from recommendations after 15 min"
+            />
+            <span className="text-xs text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
+              {workload.kind}
+            </span>
+            {workload.is_system && (
+              <span title="System workload" className="shrink-0 text-neutral-400 hover:text-neutral-700 transition-colors cursor-default">
+                <Cog size={12} />
+              </span>
+            )}
+            {workload.stability === "VARIABLE" && (
+              <span className="text-xs text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded shrink-0">
+                variable
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-neutral-400 mt-0.5">{workload.namespace}</p>
+        </div>
+        <div className="text-right shrink-0 w-36">
+          <p className="text-xs text-neutral-400 mb-0.5">CPU</p>
+          <p className="text-xs flex items-center justify-end gap-1">
+            {workload.cpu_status === "UNBOUNDED"
+              ? <span className="text-neutral-400">—</span>
+              : <span className="text-rose-400 line-through">{fmtCpu(workload.cpu_request_current)}</span>}
+            <span className="text-neutral-300">→</span>
+            <span className="text-emerald-600">{fmtCpu(workload.cpu_recommended)}</span>
+          </p>
+        </div>
+        <div className="text-right shrink-0 w-36">
+          <p className="text-xs text-neutral-400 mb-0.5">RAM</p>
+          <p className="text-xs flex items-center justify-end gap-1">
+            {workload.ram_status === "UNBOUNDED"
+              ? <span className="text-neutral-400">—</span>
+              : <span className="text-rose-400 line-through">{fmtRam(workload.ram_request_current)}</span>}
+            <span className="text-neutral-300">→</span>
+            <span className="text-emerald-600">{fmtRam(workload.ram_recommended)}</span>
+          </p>
+        </div>
+        <div className="text-right shrink-0 w-24">
+          <p className="text-xs text-neutral-400 mb-0.5">Savings</p>
+          <p className="text-xs font-semibold text-emerald-600">
+            {workload.status === "UNBOUNDED" ? "—" : `${fmt(workload.monthly_savings)}/mo`}
+          </p>
+        </div>
+        <div className="shrink-0 w-24 text-right">
+          <span
+            className={cn(
+              "text-xs px-2 py-0.5 rounded-full font-medium",
+              STATUS_STYLE[workload.status],
+            )}
+          >
+            {STATUS_LABEL[workload.status]}
+          </span>
+        </div>
+        <ArrowRight
+          size={14}
+          className="text-neutral-300 group-hover:text-neutral-600 transition-colors shrink-0"
+        />
+      </Link>
+    </div>
   );
 }
 
 function PendingRow({
   workload,
+  customerId,
+  clusterId,
   isNew,
   flashSample,
   muted,
 }: {
   workload: PendingWorkload;
+  customerId: number;
+  clusterId: number;
   isNew?: boolean;
   flashSample?: boolean;
   muted?: boolean;
@@ -688,9 +722,10 @@ function PendingRow({
     (workload.sample_count / workload.samples_required) * 100,
   );
   return (
-    <div
+    <Link
+      to={`/customers/${customerId}/clusters/${clusterId}/workloads/${workload.workload_id}`}
       className={cn(
-        "flex items-center gap-4 px-6 py-4",
+        "flex items-center gap-4 px-6 py-4 hover:bg-neutral-50 transition-colors group",
         isNew && "animate-workload-enter",
       )}
     >
@@ -745,7 +780,11 @@ function PendingRow({
           />
         </div>
       </div>
-    </div>
+      <ArrowRight
+        size={14}
+        className="text-neutral-300 group-hover:text-neutral-600 transition-colors shrink-0"
+      />
+    </Link>
   );
 }
 
@@ -783,6 +822,11 @@ export default function ClusterPage() {
   const [hourDay, setHourDay] = useState(() => todayStr());
   const [rangeFrom, setRangeFrom] = useState(() => daysAgoStr(7));
   const [rangeTo, setRangeTo] = useState(() => todayStr());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const apply = useApplyRecommendation();
 
   function navigateDay(dir: -1 | 1) {
     const d = new Date(hourDay + "T00:00:00");
@@ -830,6 +874,11 @@ export default function ClusterPage() {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelected(new Set());
+  }, [timeWindow]);
 
   const prevIdsRef = useRef<Set<number> | null>(null);
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
@@ -942,6 +991,23 @@ export default function ClusterPage() {
     }
     return recommendations.data.total_monthly_savings;
   }, [recommendations.data, hideSystem, excludeSystemFromSavings]);
+
+  const costOverview = useMemo(() => {
+    if (!summary.data) return null;
+    if (!excludeSystemFromSavings || !recommendations.data) {
+      return {
+        monthly_cost_current: summary.data.monthly_cost_current,
+        monthly_cost_recommended: summary.data.monthly_cost_recommended,
+        monthly_savings: summary.data.monthly_savings,
+      };
+    }
+    const appWorkloads = recommendations.data.workloads.filter((w) => !w.is_system);
+    return {
+      monthly_cost_current: appWorkloads.reduce((sum, w) => sum + w.monthly_cost_current, 0),
+      monthly_cost_recommended: appWorkloads.reduce((sum, w) => sum + w.monthly_cost_recommended, 0),
+      monthly_savings: appWorkloads.reduce((sum, w) => sum + w.monthly_savings, 0),
+    };
+  }, [summary.data, recommendations.data, excludeSystemFromSavings]);
 
   const activeWorkloads =
     recommendations.data?.workloads.filter(
@@ -1107,7 +1173,7 @@ export default function ClusterPage() {
                 </div>
               </div>
               <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={summary.data.monthly_cost_current} />
+                <AnimatedCurrency value={costOverview?.monthly_cost_current ?? 0} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">
                   /mo
                 </span>
@@ -1118,7 +1184,7 @@ export default function ClusterPage() {
                 Recommended
               </p>
               <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={summary.data.monthly_cost_recommended} />
+                <AnimatedCurrency value={costOverview?.monthly_cost_recommended ?? 0} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">
                   /mo
                 </span>
@@ -1137,15 +1203,15 @@ export default function ClusterPage() {
                 </div>
               </div>
               <p className="text-2xl font-semibold text-emerald-600">
-                <AnimatedCurrency value={summary.data.monthly_savings} />
+                <AnimatedCurrency value={costOverview?.monthly_savings ?? 0} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">
                   /mo
                 </span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">
                 {formatSavingsPercent(
-                  summary.data.monthly_cost_current,
-                  summary.data.monthly_savings,
+                  costOverview?.monthly_cost_current ?? 0,
+                  costOverview?.monthly_savings ?? 0,
                 )}{" "}
                 reduction
               </p>
@@ -1370,6 +1436,54 @@ export default function ClusterPage() {
             {recommendations.data && ` · ${activeWorkloads.length}`}
           </h2>
           <div className="flex items-center gap-3">
+            {selectionMode ? (
+              <>
+                <div className="flex items-center gap-1 bg-neutral-100 rounded-lg p-1">
+                  {[
+                    { label: "All",    filter: (_w: WorkloadRecommendation) => true },
+                    { label: "App",    filter: (w: WorkloadRecommendation) => !w.is_system },
+                    { label: "System", filter: (w: WorkloadRecommendation) => w.is_system },
+                  ].map(({ label, filter }) => (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        const ids = activeWorkloads
+                          .filter((w) => ACTIONABLE_STATUSES.has(w.status) && filter(w))
+                          .map((w) => w.workload_id);
+                        setSelected(new Set(ids));
+                      }}
+                      className="px-2.5 py-1 rounded-md text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:bg-white transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {selected.size > 0 && (
+                  <>
+                    <span className="text-xs text-neutral-500">{selected.size} selected</span>
+                    <button
+                      onClick={() => setShowApplyModal(true)}
+                      className="px-3 py-1.5 rounded-lg bg-[#2563AF] text-white text-xs font-medium hover:bg-[#1d4ed8] transition-colors"
+                    >
+                      Review & Apply
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { setSelectionMode(false); setSelected(new Set()); }}
+                  className="text-xs text-neutral-400 hover:text-neutral-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setSelectionMode(true)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-colors shadow-sm"
+              >
+                Optimize
+              </button>
+            )}
             {recommendations.data && displayedTotalSavings > 0 && (
               <span className="text-xs text-emerald-600 font-medium">
                 {fmt(displayedTotalSavings)}/mo total savings
@@ -1486,6 +1600,8 @@ export default function ClusterPage() {
                         customerId={customerId}
                         clusterId={clusterId}
                         isNew={newIds.has(w.workload_id)}
+                        selected={selected.has(w.workload_id)}
+                        onToggle={selectionMode ? (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }) : undefined}
                       />
                     ))}
                   </div>
@@ -1501,6 +1617,8 @@ export default function ClusterPage() {
                   customerId={customerId}
                   clusterId={clusterId}
                   isNew={newIds.has(w.workload_id)}
+                  selected={selected.has(w.workload_id)}
+                  onToggle={selectionMode ? (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }) : undefined}
                 />
               ))}
             </div>
@@ -1535,6 +1653,8 @@ export default function ClusterPage() {
                       <PendingRow
                         key={w.workload_id}
                         workload={w}
+                        customerId={customerId}
+                        clusterId={clusterId}
                         isNew={newIds.has(w.workload_id)}
                         flashSample={flashingSamples.has(w.workload_id)}
                       />
@@ -1553,6 +1673,8 @@ export default function ClusterPage() {
                   <PendingRow
                     key={w.workload_id}
                     workload={w}
+                    customerId={customerId}
+                    clusterId={clusterId}
                     isNew={newIds.has(w.workload_id)}
                     flashSample={flashingSamples.has(w.workload_id)}
                   />
@@ -1615,6 +1737,8 @@ export default function ClusterPage() {
                         <PendingRow
                           key={w.workload_id}
                           workload={w}
+                          customerId={customerId}
+                          clusterId={clusterId}
                           flashSample={flashingSamples.has(w.workload_id)}
                           muted
                         />
@@ -1637,6 +1761,8 @@ export default function ClusterPage() {
                 <PendingRow
                   key={w.workload_id}
                   workload={w}
+                  customerId={customerId}
+                  clusterId={clusterId}
                   flashSample={flashingSamples.has(w.workload_id)}
                   muted
                 />
@@ -1646,6 +1772,94 @@ export default function ClusterPage() {
         </div>
       )}
 
+      {/* Apply recommendations modal */}
+      {showApplyModal && (() => {
+        const selectedWorkloads = activeWorkloads.filter((w) => selected.has(w.workload_id));
+        const totalSavings = selectedWorkloads
+          .filter((w) => w.status !== "UNBOUNDED")
+          .reduce((sum, w) => sum + w.monthly_savings, 0);
+
+        async function handleApply() {
+          setApplying(true);
+          await Promise.allSettled(
+            selectedWorkloads.map((w) =>
+              apply.mutateAsync({ customerId, clusterId, workloadId: w.workload_id, window: timeWindow }),
+            ),
+          );
+          setApplying(false);
+          setSelected(new Set());
+          setShowApplyModal(false);
+        }
+
+        return (
+          <Dialog title="Apply Recommendations" onClose={() => !applying && setShowApplyModal(false)} size="lg">
+            <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-lg mb-5 -mt-2 text-xs text-amber-700">
+              <span>
+                Applying will reset sample collection for the selected window. Sample counts restart from 0 after each application — recommendations will be unavailable until enough new samples are collected.
+              </span>
+            </div>
+            <div className="overflow-x-auto mb-5">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-neutral-100">
+                    <th className="text-left text-neutral-400 font-medium pb-2">Workload</th>
+                    <th className="text-right text-neutral-400 font-medium pb-2 pl-4">CPU</th>
+                    <th className="text-right text-neutral-400 font-medium pb-2 pl-4">RAM</th>
+                    <th className="text-right text-neutral-400 font-medium pb-2 pl-4">Savings/mo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {selectedWorkloads.map((w) => (
+                    <tr key={w.workload_id}>
+                      <td className="py-2.5 pr-4">
+                        <p className="font-medium text-neutral-800">{w.name}</p>
+                        <p className="text-neutral-400">{w.namespace}</p>
+                      </td>
+                      <td className="py-2.5 pl-4 text-right font-mono whitespace-nowrap">
+                        <span className="text-neutral-400">{fmtCpu(w.cpu_request_current)}</span>
+                        <span className="mx-1 text-neutral-300">→</span>
+                        <span className="text-emerald-600">{fmtCpu(w.cpu_recommended)}</span>
+                      </td>
+                      <td className="py-2.5 pl-4 text-right font-mono whitespace-nowrap">
+                        <span className="text-neutral-400">{fmtRam(w.ram_request_current)}</span>
+                        <span className="mx-1 text-neutral-300">→</span>
+                        <span className="text-emerald-600">{fmtRam(w.ram_recommended)}</span>
+                      </td>
+                      <td className="py-2.5 pl-4 text-right font-medium text-emerald-600 whitespace-nowrap">
+                        {w.status === "UNBOUNDED" ? "—" : `${fmt(w.monthly_savings)}/mo`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {totalSavings > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-neutral-100">
+                      <td colSpan={3} className="pt-2.5 text-neutral-400">Total potential savings</td>
+                      <td className="pt-2.5 text-right font-semibold text-emerald-600">{fmt(totalSavings)}/mo</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowApplyModal(false)}
+                disabled={applying}
+                className="px-3 py-1.5 rounded-lg text-xs text-neutral-500 hover:text-neutral-700 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApply}
+                disabled={applying}
+                className="px-4 py-1.5 rounded-lg bg-[#2563AF] text-white text-xs font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-60"
+              >
+                {applying ? "Applying…" : `Apply ${selectedWorkloads.length} workload${selectedWorkloads.length !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
