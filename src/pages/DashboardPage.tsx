@@ -96,7 +96,7 @@ function CustomerCard({ customer }: { customer: DashboardCustomer }) {
 
           <div className="flex items-center gap-2 pt-4 border-t border-neutral-50">
             <TrendingDown size={13} className="text-emerald-500" />
-            <span className="text-sm font-semibold text-emerald-600">
+            <span className="text-sm font-semibold text-fluid-green">
               {fmt(customer.monthly_savings)}/mo
             </span>
             <span className="text-xs text-neutral-400">
@@ -242,7 +242,7 @@ export default function DashboardPage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-4 gap-4 mb-8">
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Total Monthly Spend</p>
               <p className="text-2xl font-semibold text-neutral-900">
@@ -259,13 +259,20 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">{savingsLabel(timeWindow)}</p>
-              <p className="text-2xl font-semibold text-emerald-600">
+              <p className="text-2xl font-semibold text-fluid-green">
                 <AnimatedCurrency value={data.total_monthly_savings} />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">
                 {formatSavingsPercent(data.total_monthly_cost_current, data.total_monthly_savings)} reduction
               </p>
+            </div>
+            <div className="bg-white border border-neutral-100 rounded-xl p-6">
+              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Realized Savings</p>
+              <p className="text-2xl font-semibold text-fluid-green">
+                <AnimatedCurrency value={data.total_realized_savings} />
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">all time</p>
             </div>
           </div>
 

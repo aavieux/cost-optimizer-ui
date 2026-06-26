@@ -24,8 +24,11 @@ export function useApplyRecommendation() {
     },
     onError: (err) => {
       const code = getErrorCode(err)
+      const status = (err as { response?: { status?: number } })?.response?.status
       toast.error(
-        code === 'ACCESS_DENIED'
+        status === 500
+          ? 'Could not apply — cluster is unreachable or credentials are invalid.'
+          : code === 'ACCESS_DENIED'
           ? 'You do not have permission to apply recommendations.'
           : code === 'WORKLOAD_NOT_FOUND'
           ? 'Workload not found.'

@@ -12,6 +12,7 @@ export type ClusterDetail = {
   monthly_cost_current: number
   monthly_cost_recommended: number
   monthly_savings: number
+  total_realized_savings: number
   generated_at: string
 }
 
@@ -65,6 +66,9 @@ export type PendingWorkload = {
   kind: string
   is_system: boolean
   last_seen_at: string | null
+  monthly_cost_current: number
+  cpu_request_current: string
+  ram_request_current: string
   sample_count: number
   samples_required: number
   samples_remaining: number
@@ -75,7 +79,9 @@ export type PendingWorkload = {
 export type WorkloadRecommendationsResponse = {
   cluster_id: number
   window: string
+  total_monthly_cost_current: number
   total_monthly_savings: number
+  total_realized_savings: number
   generated_at: string
   workloads: WorkloadRecommendation[]
   pending_workloads: PendingWorkload[]
@@ -96,6 +102,10 @@ export type WorkloadDetailRecommendation = {
   status: 'WASTEFUL' | 'OPTIMAL' | 'UNDER_PROVISIONED' | 'MIXED' | 'INSUFFICIENT_DATA' | 'UNBOUNDED' | 'SPEC_CHANGED'
   stability: 'STABLE' | 'VARIABLE'
   sample_count: number
+  samples_required: number
+  samples_remaining: number
+  data_span_hours: number
+  span_required_hours: number
 }
 
 export type SpecHistoryEntry = {
@@ -105,6 +115,10 @@ export type SpecHistoryEntry = {
   cpu_limit_cores: number | null
   ram_request_bytes: number
   ram_limit_bytes: number | null
+  prev_cpu_request_cores: number
+  prev_ram_request_bytes: number
+  realized_savings: number | null
+  period_end: string | null
 }
 
 export type WorkloadDetailResponse = {
@@ -122,4 +136,25 @@ export type WorkloadDetailResponse = {
   recommendation: WorkloadDetailRecommendation | null
   points: MetricPoint[]
   spec_history: SpecHistoryEntry[]
+}
+
+export type SavingsHistoryEvent = {
+  workload_id: number
+  name: string
+  namespace: string
+  kind: string
+  applied_at: string
+  active_until: string
+  cpu_request_before: string
+  ram_request_before: string
+  cpu_request_after: string
+  ram_request_after: string
+  pod_count: number
+  realized_savings: number
+}
+
+export type SavingsHistoryResponse = {
+  cluster_id: number
+  total_savings: number
+  events: SavingsHistoryEvent[]
 }

@@ -92,6 +92,14 @@ function ClusterRow({ cluster, customerId }: { cluster: ClusterSummary; customer
             <span className="text-xs font-normal text-neutral-400">/mo</span>
           </p>
         </div>
+        {cluster.total_realized_savings > 0 && (
+          <div>
+            <p className="text-xs text-neutral-400 mb-0.5">Realized</p>
+            <p className="text-sm font-semibold text-emerald-600">
+              {fmt(cluster.total_realized_savings)}
+            </p>
+          </div>
+        )}
         <ArrowRight size={14} className="text-neutral-300 group-hover:text-neutral-600 transition-colors" />
       </div>
     </Link>
@@ -180,7 +188,7 @@ export default function CustomerPage() {
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-3 divide-x divide-neutral-100">
+            <div className="grid grid-cols-4 divide-x divide-neutral-100">
               <div className="p-6">
                 <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Monthly Spend</p>
                 <p className="text-2xl font-semibold text-neutral-900">
@@ -204,6 +212,13 @@ export default function CustomerPage() {
                 <p className="text-xs text-neutral-400 mt-1">
                   {formatSavingsPercent(data.monthly_cost_current, data.monthly_savings)} reduction
                 </p>
+              </div>
+              <div className="p-6">
+                <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Realized Savings</p>
+                <p className="text-2xl font-semibold text-emerald-600">
+                  <AnimatedCurrency value={data.total_realized_savings} />
+                </p>
+                <p className="text-xs text-neutral-400 mt-1">all time</p>
               </div>
             </div>
           </div>

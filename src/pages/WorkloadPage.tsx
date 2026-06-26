@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { useWorkloadDetail } from "@/hooks/useWorkloadDetail";
 import { useApplyRecommendation } from "@/hooks/useApplyRecommendation";
-import { formatBytes, fmtCpu, fmtRam, formatSavingsPercent } from "@/lib/format";
+import { formatBytes, fmtCpu, fmtRam, formatSavingsPercent, fmtHours } from "@/lib/format";
 import { useFormatCurrency } from "@/context/CurrencyContext";
 import { getErrorCode } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -84,6 +84,26 @@ function fmtDate(v: number): string {
 function fmtCores(cores: number): string {
   if (cores < 0.1) return `${Math.round(cores * 1000)}m`;
   return `${parseFloat(cores.toFixed(3))}`;
+}
+
+function fmtDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1_000);
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const totalDays = Math.floor(totalHours / 24);
+  if (totalDays >= 1) {
+    const h = totalHours % 24;
+    return h > 0 ? `${totalDays}d ${h}h` : `${totalDays}d`;
+  }
+  if (totalHours >= 1) {
+    const m = totalMinutes % 60;
+    return m > 0 ? `${totalHours}h ${m}m` : `${totalHours}h`;
+  }
+  if (totalMinutes >= 1) {
+    const s = totalSeconds % 60;
+    return s > 0 ? `${totalMinutes}m ${s}s` : `${totalMinutes}m`;
+  }
+  return `${totalSeconds}s`;
 }
 
 // ─── WorkloadMetricChart ──────────────────────────────────────────────────────
@@ -271,17 +291,24 @@ export default function WorkloadPage() {
   }
 
   const dateRange = useMemo(() => {
+    const windowDays: Partial<Record<TimeWindow, number>> = { "1d": 1, "7d": 7, "30d": 30, "90d": 90 };
+    const days = windowDays[timeWindow] ?? 7;
+
     if (granularity === "hour") {
       const d = new Date(hourDay + "T00:00:00");
       const isToday = hourDay === todayStr();
       const to = isToday ? new Date() : new Date(d.getTime() + 86_400_000 + 3_600_000);
-      return { from: d.toISOString(), to: to.toISOString() };
+      // from must reach back at least the full window so the backend sees all samples
+      const windowFrom = new Date(to);
+      windowFrom.setDate(windowFrom.getDate() - days);
+      const from = new Date(Math.min(d.getTime(), windowFrom.getTime()));
+      return { from: from.toISOString(), to: to.toISOString() };
     }
     const to = new Date();
     const from = new Date(to);
-    from.setDate(from.getDate() - 30);
+    from.setDate(from.getDate() - Math.max(days, 30));
     return { from: from.toISOString(), to: to.toISOString() };
-  }, [granularity, hourDay]);
+  }, [granularity, hourDay, timeWindow]);
 
   const fmt = useFormatCurrency();
   const detail = useWorkloadDetail({
@@ -290,15 +317,36 @@ export default function WorkloadPage() {
     workloadId,
     timeWindow,
     ...dateRange,
-    granularity,
+    granularity: granularity === "hour" ? "hour" : "day",
+  });
+
+  // Separate fetch for recommendation only — uses a clean wide range so sample_count
+  // matches what the cluster list shows (no granularity/from/to scoping artifacts).
+  const recRange = useMemo(() => {
+    const windowDays: Partial<Record<TimeWindow, number>> = { "1d": 1, "7d": 7, "30d": 30, "90d": 90 };
+    const days = windowDays[timeWindow] ?? 7;
+    const to = new Date();
+    const from = new Date(to);
+    from.setDate(from.getDate() - days);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [timeWindow]);
+
+  const recDetail = useWorkloadDetail({
+    customerId,
+    clusterId,
+    workloadId,
+    timeWindow,
+    ...recRange,
+    granularity: "day",
   });
 
   const chartData = useMemo<WChartPoint[]>(() => {
     const points = detail.data?.points ?? [];
     if (granularity === "hour") {
-      const dayEnd = new Date(hourDay + "T00:00:00").getTime() + 86_400_000;
+      const dayStart = new Date(hourDay + "T00:00:00").getTime();
+      const dayEnd = dayStart + 86_400_000;
       return points
-        .filter((p) => new Date(p.ts).getTime() <= dayEnd)
+        .filter((p) => { const t = new Date(p.ts).getTime(); return t >= dayStart && t <= dayEnd; })
         .map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
     }
     return points.map((p) => ({ ...p, ts_ms: new Date(p.ts).getTime() }));
@@ -335,8 +383,9 @@ export default function WorkloadPage() {
     return <Navigate to="/customers" replace />;
   }
 
-  const workload = detail.data;
-  const rec = workload?.recommendation;
+  // chart data comes from detail; recommendation/metadata from recDetail (clean params → correct sample counts)
+  const workload = recDetail.data ?? detail.data;
+  const rec = recDetail.data?.recommendation;
 
   return (
     <div className="px-8 py-8 max-w-6xl mx-auto">
@@ -514,7 +563,7 @@ export default function WorkloadPage() {
         )}
 
         <div className="px-6 py-6">
-          {detail.isLoading && (
+          {recDetail.isLoading && (
             <div className="space-y-3">
               <div className="h-4 w-48 bg-neutral-100 rounded animate-pulse" />
               <div className="h-4 w-32 bg-neutral-100 rounded animate-pulse" />
@@ -531,35 +580,49 @@ export default function WorkloadPage() {
             </div>
           )}
 
-          {/* Spec changed: treat as pending, not an error */}
-          {rec?.status === "SPEC_CHANGED" && (
-            <div className="flex items-start gap-3">
-              <Info size={14} className="text-neutral-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm text-neutral-700">
-                  Spec recently changed — collecting new samples for the selected window.
-                </p>
-                <p className="text-xs text-neutral-400 mt-1">
-                  {rec.sample_count} samples collected so far
-                </p>
+          {/* Spec changed / Insufficient data: show dual progress */}
+          {(rec?.status === "SPEC_CHANGED" || rec?.status === "INSUFFICIENT_DATA") && rec && (() => {
+            const isSpecChanged = rec.status === "SPEC_CHANGED";
+            const samplePct = Math.min(100, Math.round((rec.sample_count / rec.samples_required) * 100));
+            const timePct   = Math.min(100, Math.round((rec.data_span_hours / rec.span_required_hours) * 100));
+            const barColor  = isSpecChanged ? "bg-neutral-300" : "bg-emerald-400";
+            return (
+              <div className="flex items-start gap-3">
+                <Info size={14} className="text-neutral-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-neutral-700">
+                    {isSpecChanged
+                      ? "Spec recently changed — collecting new samples for the selected window."
+                      : "Collecting samples for the selected window."}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-neutral-400">Samples</span>
+                        <span className="text-xs text-neutral-400">
+                          {rec.sample_count.toLocaleString()} / {rec.samples_required.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${samplePct}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-neutral-400">Time</span>
+                        <span className="text-xs text-neutral-400">
+                          {fmtHours(rec.data_span_hours)} / {fmtHours(rec.span_required_hours)}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${timePct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Insufficient data: not enough history yet */}
-          {rec?.status === "INSUFFICIENT_DATA" && (
-            <div className="flex items-start gap-3">
-              <Info size={14} className="text-neutral-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm text-neutral-700">
-                  Collecting samples for the selected window.
-                </p>
-                <p className="text-xs text-neutral-400 mt-1">
-                  {rec.sample_count} samples collected so far
-                </p>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Active recommendation */}
           {rec &&
@@ -665,7 +728,7 @@ export default function WorkloadPage() {
                         <>
                           <div className="flex justify-between">
                             <span className="text-xs text-neutral-400">Savings</span>
-                            <span className="text-xs text-emerald-600 font-medium">
+                            <span className="text-xs text-fluid-green font-medium">
                               {fmt(rec.monthly_savings)}/mo
                             </span>
                           </div>
@@ -756,14 +819,45 @@ export default function WorkloadPage() {
                 <th className="text-right text-neutral-400 font-medium px-3 py-2.5">CPU req</th>
                 <th className="text-right text-neutral-400 font-medium px-3 py-2.5">CPU lim</th>
                 <th className="text-right text-neutral-400 font-medium px-3 py-2.5">RAM req</th>
-                <th className="text-right text-neutral-400 font-medium px-6 py-2.5">RAM lim</th>
+                <th className="text-right text-neutral-400 font-medium px-3 py-2.5">RAM lim</th>
+                <th className="text-right text-neutral-400 font-medium px-6 py-2.5">Realized savings</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {workload.spec_history.map((entry, i) => (
-                <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                  <td className="px-6 py-3 text-neutral-400 whitespace-nowrap">
-                    {new Date(entry.recorded_at).toLocaleString()}
+                <tr
+                  key={i}
+                  className={cn(
+                    "transition-colors",
+                    i === 0
+                      ? "bg-emerald-50/40 hover:bg-emerald-50/60"
+                      : "hover:bg-neutral-50",
+                  )}
+                >
+                  <td
+                    className={cn(
+                      "py-3 text-neutral-400 whitespace-nowrap",
+                      i === 0
+                        ? "pl-[22px] pr-6 border-l-2 border-l-emerald-400"
+                        : "px-6",
+                    )}
+                  >
+                    <p>{new Date(entry.recorded_at).toLocaleString()}</p>
+                    {i === 0 ? (
+                      <p className="text-emerald-500 mt-0.5 font-medium">
+                        until Now
+                        <span className="ml-1.5 text-emerald-400 font-normal">
+                          ({fmtDuration(now - new Date(entry.recorded_at).getTime())})
+                        </span>
+                      </p>
+                    ) : entry.period_end ? (
+                      <p className="text-neutral-300 mt-0.5">
+                        until {new Date(entry.period_end).toLocaleString()}
+                        <span className="ml-1.5">
+                          ({fmtDuration(new Date(entry.period_end).getTime() - new Date(entry.recorded_at).getTime())})
+                        </span>
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3">
                     <span className={cn(
@@ -775,17 +869,39 @@ export default function WorkloadPage() {
                       {entry.source}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-right font-mono text-neutral-700">
-                    {fmtCores(entry.cpu_request_cores)}
+                  <td className="px-3 py-3 text-right font-mono whitespace-nowrap">
+                    {entry.source === "applied" && entry.prev_cpu_request_cores > 0 ? (
+                      <>
+                        <span className="text-neutral-300 line-through">{fmtCores(entry.prev_cpu_request_cores)}</span>
+                        <span className="mx-1 text-neutral-200">→</span>
+                        <span className="text-neutral-700">{fmtCores(entry.cpu_request_cores)}</span>
+                      </>
+                    ) : (
+                      <span className="text-neutral-700">{fmtCores(entry.cpu_request_cores)}</span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right font-mono text-neutral-400">
                     {entry.cpu_limit_cores != null ? fmtCores(entry.cpu_limit_cores) : "—"}
                   </td>
-                  <td className="px-3 py-3 text-right font-mono text-neutral-700">
-                    {formatBytes(entry.ram_request_bytes)}
+                  <td className="px-3 py-3 text-right font-mono whitespace-nowrap">
+                    {entry.source === "applied" && entry.prev_ram_request_bytes > 0 ? (
+                      <>
+                        <span className="text-neutral-300 line-through">{formatBytes(entry.prev_ram_request_bytes)}</span>
+                        <span className="mx-1 text-neutral-200">→</span>
+                        <span className="text-neutral-700">{formatBytes(entry.ram_request_bytes)}</span>
+                      </>
+                    ) : (
+                      <span className="text-neutral-700">{formatBytes(entry.ram_request_bytes)}</span>
+                    )}
                   </td>
-                  <td className="px-6 py-3 text-right font-mono text-neutral-400">
+                  <td className="px-3 py-3 text-right font-mono text-neutral-400">
                     {entry.ram_limit_bytes != null ? formatBytes(entry.ram_limit_bytes) : "—"}
+                  </td>
+                  <td className="px-6 py-3 text-right font-medium whitespace-nowrap">
+                    {entry.realized_savings != null
+                      ? <span className="text-fluid-green">{fmt(entry.realized_savings)}</span>
+                      : <span className="text-neutral-300">—</span>
+                    }
                   </td>
                 </tr>
               ))}
