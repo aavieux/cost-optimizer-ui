@@ -6,9 +6,7 @@ import {
   ChevronDown,
   ArrowUp,
   ArrowDown,
-  Info,
   Cog,
-  ChevronRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -37,6 +35,9 @@ import { useFormatCurrency } from "@/context/CurrencyContext";
 import { getErrorCode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import AnimatedCurrency from "@/components/AnimatedCurrency";
+import RealizedAmount from "@/components/RealizedAmount";
+import CostOverviewRibbon from "@/components/CostOverviewRibbon";
+import PotentialAmount from "@/components/PotentialAmount";
 import Dialog from "@/components/Dialog";
 import type { TimeWindow } from "@/types/dashboard";
 import type {
@@ -47,15 +48,6 @@ import type {
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
-const TIME_WINDOWS: { label: string; value: TimeWindow; diagnostic?: boolean }[] = [
-  { label: "1d", value: "1d", diagnostic: true },
-  { label: "7d", value: "7d" },
-  { label: "30d", value: "30d" },
-];
-
-function savingsLabel(): string {
-  return "Potential Monthly Savings"
-}
 
 const PROVIDER_STYLE: Record<string, string> = {
   azure: "text-blue-600 bg-blue-50",
@@ -733,8 +725,8 @@ function WorkloadRow({
         </div>
         <div className="text-right shrink-0 w-24">
           <p className="text-xs text-neutral-400 mb-0.5">Savings</p>
-          <p className="text-xs font-semibold text-fluid-green">
-            {workload.status === "UNBOUNDED" ? "—" : `${fmt(workload.monthly_savings)}/mo`}
+          <p className="text-xs font-semibold">
+            {workload.status === "UNBOUNDED" ? <span className="text-neutral-400">—</span> : <PotentialAmount value={workload.monthly_savings} />}
           </p>
         </div>
         <div className="shrink-0 w-24 text-right">
@@ -1241,133 +1233,18 @@ export default function ClusterPage() {
       {/* Stats cards */}
       {summary.data && (
         <div className="bg-white border border-neutral-100 rounded-xl mb-8">
-          <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
-            <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">Cost Overview</p>
-            <div className="flex items-center gap-1 bg-white/50 border border-white/60 rounded-lg p-1">
-              {TIME_WINDOWS.map(({ label, value, diagnostic }) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setTimeWindow(value);
-                    localStorage.setItem("time_window", value);
-                  }}
-                  className={cn(
-                    "px-3 py-1 rounded-md text-xs font-medium transition-colors",
-                    timeWindow === value && diagnostic
-                      ? "bg-amber-50 text-amber-700 shadow-sm"
-                      : timeWindow === value
-                      ? "bg-[#2563AF]/10 text-[#2563AF]"
-                      : "text-neutral-400 hover:text-neutral-700",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {timeWindow === "1d" && (
-            <div className="flex items-center gap-2 px-6 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
-              <span className="font-medium">Diagnostic view</span>
-              <span className="text-amber-400">·</span>
-              <span>Low data thresholds — not recommended for production rightsizing decisions</span>
-            </div>
-          )}
-          <div className="grid grid-cols-4 divide-x divide-neutral-100">
-            <div className="p-6">
-              <div className="flex items-center gap-1 mb-2">
-                <p className="text-xs text-neutral-400 uppercase tracking-wide">
-                  Current Monthly Price
-                </p>
-                <div className="relative group/tip">
-                  <Info size={11} className="text-neutral-300 cursor-default" />
-                  <div className="absolute bottom-full left-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
-                    Estimated monthly cost based on the current resource requests of all active workloads and their pod counts.
-                  </div>
-                </div>
-              </div>
-              <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={costOverview?.monthly_cost_current ?? 0} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">
-                  /mo
-                </span>
-              </p>
-              {unboundedInfo && unboundedInfo.count > 0 && (
-                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-300 inline-block shrink-0" />
-                  excludes {unboundedInfo.count} unbounded
-                </p>
-              )}
-            </div>
-            <div className="p-6">
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">
-                Recommended
-              </p>
-              <p className="text-2xl font-semibold text-neutral-900">
-                <AnimatedCurrency value={costOverview?.monthly_cost_recommended ?? 0} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">
-                  /mo
-                </span>
-              </p>
-              {unboundedInfo && unboundedInfo.count > 0 && (
-                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-300 inline-block shrink-0" />
-                  {fmt(unboundedInfo.monthly_cost_recommended)} unbounded
-                  <div className="relative group/tip">
-                    <Info size={11} className="text-neutral-300 cursor-default" />
-                    <div className="absolute bottom-full left-0 mb-2 w-64 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
-                      Unbounded workloads have no CPU or memory limit set, so their true cost cannot be determined. This figure reflects the recommended cost if limits were applied — it is not included in the main recommended total.
-                    </div>
-                  </div>
-                </p>
-              )}
-            </div>
-            <div className="p-6">
-              <div className="flex items-center gap-1 mb-2">
-                <p className="text-xs text-neutral-400 uppercase tracking-wide">
-                  {savingsLabel()}
-                </p>
-                <div className="relative group/tip">
-                  <Info size={11} className="text-neutral-300 cursor-default" />
-                  <div className="absolute bottom-full right-0 mb-2 w-60 px-3 py-2 bg-neutral-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20 leading-relaxed">
-                    Projected monthly savings based on <span className="font-medium">{timeWindow}</span> of usage data. Recent changes to workload behavior may take a full {timeWindow} window to be reflected.
-                  </div>
-                </div>
-              </div>
-              <p className="text-2xl font-semibold text-fluid-green">
-                <AnimatedCurrency value={costOverview?.monthly_savings ?? 0} />
-                <span className="text-sm font-normal text-neutral-400 ml-1">
-                  /mo
-                </span>
-              </p>
-              <p className="text-xs text-neutral-400 mt-1">
-                {formatSavingsPercent(
-                  costOverview?.monthly_cost_current ?? 0,
-                  costOverview?.monthly_savings ?? 0,
-                )}{" "}
-                reduction
-              </p>
-              {summary.data.workload_breakdown.insufficient_data > 0 && (
-                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 inline-block shrink-0" />
-                  {summary.data.workload_breakdown.insufficient_data} insufficient
-                  data
-                </p>
-              )}
-            </div>
-            <div
-              className="p-6 group cursor-pointer hover:bg-neutral-50 transition-colors rounded-br-xl"
-              onClick={() => setShowSavingsHistory(true)}
-            >
-              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Realized Savings</p>
-              <p className="text-2xl font-semibold text-fluid-green">
-                <AnimatedCurrency value={summary.data.total_realized_savings} />
-              </p>
-              <p className="text-xs text-neutral-400 mt-1 flex items-center gap-1">
-                all time
-                <ChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-              </p>
-            </div>
-          </div>
+          <CostOverviewRibbon
+            costOverview={costOverview}
+            realizedSavings={summary.data.total_realized_savings}
+            unboundedInfo={unboundedInfo}
+            insufficientDataCount={summary.data.workload_breakdown.insufficient_data}
+            timeWindow={timeWindow}
+            onTimeWindowChange={(w) => {
+              setTimeWindow(w);
+              localStorage.setItem("time_window", w);
+            }}
+            onShowHistory={() => setShowSavingsHistory(true)}
+          />
         </div>
       )}
 
@@ -1683,8 +1560,8 @@ export default function ClusterPage() {
               </button>
             )}
             {!selectionMode && recommendations.data && displayedTotalSavings > 0 && (
-              <span className="text-xs text-fluid-green font-medium">
-                {fmt(displayedTotalSavings)}/mo total savings
+              <span className="text-xs font-medium">
+                <PotentialAmount value={displayedTotalSavings} />/mo total savings
               </span>
             )}
             {!selectionMode && (
@@ -2029,8 +1906,8 @@ export default function ClusterPage() {
                   placeholder="Search workloads…"
                   className="text-xs border border-neutral-200 rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-1 focus:ring-neutral-300 placeholder:text-neutral-300"
                 />
-                <p className="text-sm font-semibold text-fluid-green">
-                  {fmt(savingsHistory.data!.total_savings)} total
+                <p className="text-sm font-semibold">
+                  <RealizedAmount value={savingsHistory.data!.total_savings} /> total
                 </p>
               </div>
               {filteredEvents.length === 0 ? (
@@ -2097,8 +1974,8 @@ export default function ClusterPage() {
                               <td className="py-2.5 pl-4 text-right text-neutral-600">
                                 {e.pod_count}
                               </td>
-                              <td className="py-2.5 pl-4 text-right font-medium text-fluid-green whitespace-nowrap">
-                                {fmt(e.realized_savings)}
+                              <td className="py-2.5 pl-4 text-right font-medium whitespace-nowrap">
+                                <RealizedAmount value={e.realized_savings} />
                               </td>
                             </tr>
                           );
@@ -2107,8 +1984,8 @@ export default function ClusterPage() {
                     <tfoot>
                       <tr className="border-t border-neutral-100">
                         <td colSpan={7} className="pt-2.5 text-neutral-400">Total realized savings</td>
-                        <td className="pt-2.5 text-right font-semibold text-fluid-green">
-                          {fmt(savingsHistory.data!.total_savings)}
+                        <td className="pt-2.5 text-right font-semibold">
+                          <RealizedAmount value={savingsHistory.data!.total_savings} />
                         </td>
                       </tr>
                     </tfoot>
@@ -2174,8 +2051,8 @@ export default function ClusterPage() {
                         <span className="mx-1 text-neutral-300">→</span>
                         <span className="text-emerald-600">{fmtRam(w.ram_recommended)}</span>
                       </td>
-                      <td className="py-2.5 pl-4 text-right font-medium text-fluid-green whitespace-nowrap">
-                        {w.status === "UNBOUNDED" ? "—" : `${fmt(w.monthly_savings)}/mo`}
+                      <td className="py-2.5 pl-4 text-right font-medium whitespace-nowrap">
+                        {w.status === "UNBOUNDED" ? <span className="text-neutral-400">—</span> : <><PotentialAmount value={w.monthly_savings} />/mo</>}
                       </td>
                     </tr>
                   ))}
@@ -2184,7 +2061,7 @@ export default function ClusterPage() {
                   <tfoot>
                     <tr className="border-t border-neutral-100">
                       <td colSpan={3} className="pt-2.5 text-neutral-400">Total potential savings</td>
-                      <td className="pt-2.5 text-right font-semibold text-fluid-green">{fmt(totalSavings)}/mo</td>
+                      <td className="pt-2.5 text-right font-semibold"><PotentialAmount value={totalSavings} />/mo</td>
                     </tr>
                   </tfoot>
                 )}

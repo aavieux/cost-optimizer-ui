@@ -178,9 +178,18 @@
 
 /* ─── fluid green gradient text ─────────────────────────────────────────── */
 .text-fluid-green {
-  background: linear-gradient(120deg, #6ee7b7, #34d399, #a7f3d0, #34d399, #6ee7b7);
+  background: linear-gradient(120deg, #10b981, #047857, #065f46, #047857, #10b981);
   background-size: 300% 300%;
-  animation: btn-fluid 4s ease infinite;
+  animation: btn-fluid 10s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-fluid-blue {
+  background: linear-gradient(120deg, #60a5fa, #3b82f6, #2563eb, #3b82f6, #60a5fa);
+  background-size: 300% 300%;
+  animation: btn-fluid 10s ease infinite;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

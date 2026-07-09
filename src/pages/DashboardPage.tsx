@@ -6,6 +6,8 @@ import { getErrorCode } from '@/lib/api'
 import { formatSavingsPercent } from '@/lib/format'
 import { useFormatCurrency } from '@/context/CurrencyContext'
 import AnimatedCurrency from '@/components/AnimatedCurrency'
+import RealizedAmount from '@/components/RealizedAmount'
+import PotentialAmount from '@/components/PotentialAmount'
 import { cn } from '@/lib/utils'
 import type { DashboardCustomer, TimeWindow } from '@/types/dashboard'
 
@@ -96,8 +98,8 @@ function CustomerCard({ customer }: { customer: DashboardCustomer }) {
 
           <div className="flex items-center gap-2 pt-4 border-t border-neutral-50">
             <TrendingDown size={13} className="text-emerald-500" />
-            <span className="text-sm font-semibold text-fluid-green">
-              {fmt(customer.monthly_savings)}/mo
+            <span className="text-sm font-semibold">
+              <PotentialAmount value={customer.monthly_savings} />/mo
             </span>
             <span className="text-xs text-neutral-400">
               · {formatSavingsPercent(customer.monthly_cost_current, customer.monthly_savings)} savings
@@ -259,8 +261,8 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">{savingsLabel(timeWindow)}</p>
-              <p className="text-2xl font-semibold text-fluid-green">
-                <AnimatedCurrency value={data.total_monthly_savings} />
+              <p className="text-2xl font-semibold">
+                <PotentialAmount value={data.total_monthly_savings} animated />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">
@@ -269,8 +271,8 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Realized Savings</p>
-              <p className="text-2xl font-semibold text-fluid-green">
-                <AnimatedCurrency value={data.total_realized_savings} />
+              <p className="text-2xl font-semibold">
+                <RealizedAmount value={data.total_realized_savings} animated />
               </p>
               <p className="text-xs text-neutral-400 mt-1">all time</p>
             </div>

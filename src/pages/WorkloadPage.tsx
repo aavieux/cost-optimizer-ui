@@ -16,6 +16,8 @@ import { useWorkloadDetail } from "@/hooks/useWorkloadDetail";
 import { useApplyRecommendation } from "@/hooks/useApplyRecommendation";
 import { formatBytes, fmtCpu, fmtRam, formatSavingsPercent, fmtHours } from "@/lib/format";
 import { useFormatCurrency } from "@/context/CurrencyContext";
+import RealizedAmount from "@/components/RealizedAmount";
+import PotentialAmount from "@/components/PotentialAmount";
 import { getErrorCode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { TimeWindow } from "@/types/dashboard";
@@ -728,8 +730,8 @@ export default function WorkloadPage() {
                         <>
                           <div className="flex justify-between">
                             <span className="text-xs text-neutral-400">Savings</span>
-                            <span className="text-xs text-fluid-green font-medium">
-                              {fmt(rec.monthly_savings)}/mo
+                            <span className="text-xs font-medium">
+                              <PotentialAmount value={rec.monthly_savings} />/mo
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -899,7 +901,7 @@ export default function WorkloadPage() {
                   </td>
                   <td className="px-6 py-3 text-right font-medium whitespace-nowrap">
                     {entry.realized_savings != null
-                      ? <span className="text-fluid-green">{fmt(entry.realized_savings)}</span>
+                      ? <RealizedAmount value={entry.realized_savings} />
                       : <span className="text-neutral-300">—</span>
                     }
                   </td>
