@@ -29,6 +29,7 @@ export type ClusterSummary = {
   monthly_cost_current: number
   monthly_cost_recommended: number
   monthly_savings: number
+  total_realized_savings: number
 }
 
 export type CustomerSummary = {
@@ -45,6 +46,7 @@ export type CustomerSummary = {
   monthly_cost_current: number
   monthly_cost_recommended: number
   monthly_savings: number
+  total_realized_savings: number
   clusters: ClusterSummary[]
   generated_at: string
 }

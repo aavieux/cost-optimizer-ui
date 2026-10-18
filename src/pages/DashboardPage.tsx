@@ -6,6 +6,8 @@ import { getErrorCode } from '@/lib/api'
 import { formatSavingsPercent } from '@/lib/format'
 import { useFormatCurrency } from '@/context/CurrencyContext'
 import AnimatedCurrency from '@/components/AnimatedCurrency'
+import RealizedAmount from '@/components/RealizedAmount'
+import PotentialAmount from '@/components/PotentialAmount'
 import { cn } from '@/lib/utils'
 import type { DashboardCustomer, TimeWindow } from '@/types/dashboard'
 
@@ -26,7 +28,7 @@ type SortKey = typeof SORT_OPTIONS[number]['value']
 
 function savingsLabel(window: TimeWindow): string {
   if (window === '7d') return 'Weekly Savings'
-  return 'Monthly Savings'
+  return 'Potential Monthly Savings'
 }
 
 function sortCustomers(customers: DashboardCustomer[], key: SortKey): DashboardCustomer[] {
@@ -96,8 +98,8 @@ function CustomerCard({ customer }: { customer: DashboardCustomer }) {
 
           <div className="flex items-center gap-2 pt-4 border-t border-neutral-50">
             <TrendingDown size={13} className="text-emerald-500" />
-            <span className="text-sm font-semibold text-emerald-600">
-              {fmt(customer.monthly_savings)}/mo
+            <span className="text-sm font-semibold">
+              <PotentialAmount value={customer.monthly_savings} />/mo
             </span>
             <span className="text-xs text-neutral-400">
               · {formatSavingsPercent(customer.monthly_cost_current, customer.monthly_savings)} savings
@@ -242,7 +244,7 @@ export default function DashboardPage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-4 gap-4 mb-8">
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Total Monthly Spend</p>
               <p className="text-2xl font-semibold text-neutral-900">
@@ -259,13 +261,20 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white border border-neutral-100 rounded-xl p-6">
               <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">{savingsLabel(timeWindow)}</p>
-              <p className="text-2xl font-semibold text-emerald-600">
-                <AnimatedCurrency value={data.total_monthly_savings} />
+              <p className="text-2xl font-semibold">
+                <PotentialAmount value={data.total_monthly_savings} animated />
                 <span className="text-sm font-normal text-neutral-400 ml-1">/mo</span>
               </p>
               <p className="text-xs text-neutral-400 mt-1">
                 {formatSavingsPercent(data.total_monthly_cost_current, data.total_monthly_savings)} reduction
               </p>
+            </div>
+            <div className="bg-white border border-neutral-100 rounded-xl p-6">
+              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-2">Realized Savings</p>
+              <p className="text-2xl font-semibold">
+                <RealizedAmount value={data.total_realized_savings} animated />
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">all time</p>
             </div>
           </div>
 

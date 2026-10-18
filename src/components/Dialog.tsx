@@ -6,9 +6,10 @@ type Props = {
   title: string
   onClose: () => void
   children: React.ReactNode
+  size?: 'sm' | 'lg' | 'xl'
 }
 
-export default function Dialog({ title, onClose, children }: Props) {
+export default function Dialog({ title, onClose, children, size = 'sm' }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const titleId = useId()
@@ -58,7 +59,7 @@ export default function Dialog({ title, onClose, children }: Props) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="bg-white rounded-xl shadow-sm border border-neutral-100 w-full max-w-sm mx-4 p-6 outline-none"
+        className={`bg-white rounded-xl shadow-sm border border-neutral-100 w-full mx-4 p-6 outline-none ${size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-sm'}`}
       >
         <h2 id={titleId} className="text-sm font-semibold text-neutral-900 mb-5">{title}</h2>
         {children}

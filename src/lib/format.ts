@@ -30,6 +30,15 @@ export function fmtRam(raw: string): string {
   return raw
 }
 
+export function fmtHours(hours: number): string {
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 export function formatSavingsPercent(current: number, savings: number): string {
   if (current === 0) return "0%";
   return `${((savings / current) * 100).toFixed(1)}%`;

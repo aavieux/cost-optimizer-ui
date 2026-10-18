@@ -33,6 +33,7 @@ export type DashboardResponse = {
   total_monthly_cost_current: number
   total_monthly_cost_recommended: number
   total_monthly_savings: number
+  total_realized_savings: number
   customers: DashboardCustomer[]
   generated_at: string
 }
